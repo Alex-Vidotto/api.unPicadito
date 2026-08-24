@@ -18,7 +18,8 @@
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.23.3",
     "reflect-metadata": "^0.2.2",
-    "typeorm": "^1.1.0"
+    "typeorm": "^1.1.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
