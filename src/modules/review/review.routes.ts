@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createReview, getAverageRating } from './review.repository.js';
+import { createReview, getAverageRating } from './review.repository';
 
 const router = Router();
 

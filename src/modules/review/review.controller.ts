@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ReviewService } from './review.service.js';
+import { ReviewService } from './review.service';
 
 export const ReviewController = {
     crear: async (req: Request, res: Response): Promise<void> => {

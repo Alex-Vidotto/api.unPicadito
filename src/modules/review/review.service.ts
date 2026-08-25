@@ -1,4 +1,4 @@
-import { createReview, getAverageRating } from './review.repository.js';
+import { createReview, getAverageRating } from './review.repository';
 import { Review } from './review.entity.js';
 
 export const ReviewService = {

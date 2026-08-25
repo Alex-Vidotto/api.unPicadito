@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { Usuario } from '../usuario/usuario.entity.js';
-import { Sala } from '../sala/sala.entity.js';
+import { Usuario } from '../usuario/usuario.entity';
+import { Sala } from '../sala/sala.entity';
 
 @Entity('reviews')
 export class Review {
@@ -27,5 +27,5 @@ export class Review {
     sala: Sala;
 
     @CreateDateColumn()
-    createdAt: Date;
+    creadoEn: Date;
 }

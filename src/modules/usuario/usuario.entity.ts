@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { Review } from '../review/review.entity.js';
+import { Review } from "../review/review.entity"; 
+
 
 @Entity('usuarios')
 export class Usuario {

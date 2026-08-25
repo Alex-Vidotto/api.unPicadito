@@ -1,6 +1,6 @@
 import express from "express";
-import { AppDataSource } from "./database/data-source.js";
-import reviewRoutes from "./modules/review/review.routes.js";
+import { AppDataSource } from "./database/data-source";
+import reviewRoutes from "./modules/review/review.routes";
 import dotenv from "dotenv";
 
 dotenv.config();

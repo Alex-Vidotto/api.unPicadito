@@ -1,5 +1,5 @@
-import { AppDataSource } from "../../database/data-source.js";
-import { Review } from "./review.entity.js";
+import { AppDataSource } from "../../database/data-source";
+import { Review } from "./review.entity";
 
 export const repo = () => AppDataSource.getRepository(Review);
 
