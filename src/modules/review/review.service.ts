@@ -1,5 +1,5 @@
 import { createReview, getAverageRating } from './review.repository';
-import { Review } from './review.entity.js';
+import { Review } from './review.entity';
 
 export const ReviewService = {
     guardarResena: async (datos: Partial<Review>) => {
