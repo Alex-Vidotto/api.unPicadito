@@ -1,20 +1,18 @@
 import "reflect-metadata";
-import dotenv from "dotenv";
 import { DataSource } from "typeorm";
-import { Usuario } from "../modules/usuario/usuario.entity";
-import { Amistad } from "../modules/amistad/amistades.entity";
-import { Sala } from "../modules/sala/sala.entity";
-import { ParticipacionSala } from "../modules/participacionSala/participacionSala.entity";
-
-dotenv.config();
+import { Usuario } from "../modules/usuario/usuario.entity.js";
+import { Sala } from "../modules/sala/sala.entity.js";
+import { Review } from "../modules/review/review.entity.js";
+import { Amistad } from "../modules/amistad/amistades.entity.js";
+import { ParticipacionSala } from "../modules/participacionSala/participacionSala.entity.js";
 
 export const AppDataSource = new DataSource({
     type: "mysql",
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT),
-    username: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
+    host: process.env.DB_HOST || "localhost",
+    port: Number(process.env.DB_PORT) || 3306,
+    username: process.env.DB_USER || "root",
+    password: process.env.DB_PASS || "",
+    database: process.env.DB_NAME || "picadito_db", 
     synchronize: true,
-    entities: [Usuario, Amistad, Sala, ParticipacionSala],
+    entities: [Usuario, Amistad, Sala, ParticipacionSala, Review],
 });

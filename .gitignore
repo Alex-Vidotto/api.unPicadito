@@ -1,2 +1,22 @@
+# Dependencias
+node_modules/
+
+# Entorno y variables secretas
 .env
-node_modules
+.env.local
+
+# Compilación de TypeScript
+dist/
+build/
+*.tsbuildinfo
+
+# Logs de error de npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema Operativo y Editores
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

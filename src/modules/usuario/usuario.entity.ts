@@ -3,6 +3,7 @@ import { Amistad } from "../amistad/amistades.entity";
 import { PosicionCancha } from "../../constants/type";
 import { Sala } from "../sala/sala.entity";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
+import { Review } from "../review/review.entity";
 
 @Entity("usuarios")
 export class Usuario {
@@ -53,4 +54,12 @@ export class Usuario {
 
     @UpdateDateColumn()
     actualizadoEn: Date;
+
+    @OneToMany(() => Review, (review) => review.calificador)
+    resenasEscritas: Review[];
+
+    @OneToMany(() => Review, (review) => review.calificado)
+    resenasRecibidas: Review[];
+
+
 }

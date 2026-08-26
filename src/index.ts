@@ -1,11 +1,14 @@
-import "reflect-metadata";
-import express from "express";
 import dotenv from "dotenv";
 dotenv.config();
 
+import "reflect-metadata";
+import express from "express";
+import reviewRoutes from "./modules/review/review.routes";
 import { AppDataSource } from "./database/data-source";
 
+
 const app = express();
+app.use("/api/reviews", reviewRoutes); 
 app.use(express.json());
 
 AppDataSource.initialize()
