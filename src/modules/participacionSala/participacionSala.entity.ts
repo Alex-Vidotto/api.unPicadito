@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Unique } from "typeorm";
-import { Usuario } from '../usuario/usuario.entity';
+import { User } from '../user/user.entity';
 import { Sala } from '../sala/sala.entity';
 import { RolEnSala, EstadoParticipacion, OrigenIngreso } from '../../constants/type';
 
@@ -9,9 +9,9 @@ export class ParticipacionSala {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ManyToOne(() => Usuario, (user) => user.participacion, { onDelete: 'CASCADE' })
+    @ManyToOne(() => User, (user) => user.participacion, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'usuario_id' })
-    usuario: Usuario;
+    usuario: User;
 
     @ManyToOne(() => Sala, (sala) => sala.participantes, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'sala_id' })
