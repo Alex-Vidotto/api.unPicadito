@@ -6,7 +6,7 @@ import { ParticipacionSala } from "../participacionSala/participacionSala.entity
 import { Review } from "../review/review.entity";
 
 @Entity("usuarios")
-export class Usuario {
+export class User {
     @PrimaryGeneratedColumn("increment")
     id: number;
 

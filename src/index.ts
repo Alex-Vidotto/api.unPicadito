@@ -4,11 +4,14 @@ dotenv.config();
 import "reflect-metadata";
 import express from "express";
 import reviewRoutes from "./modules/review/review.routes";
+import userRoutes from "./modules/user/user.routes";
 import { AppDataSource } from "./database/data-source";
 
 
 const app = express();
 app.use("/api/reviews", reviewRoutes); 
+app.use("/api/users", userRoutes);
+
 app.use(express.json());
 
 AppDataSource.initialize()

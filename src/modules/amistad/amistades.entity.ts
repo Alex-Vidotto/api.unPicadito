@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
-import { Usuario } from '../usuario/usuario.entity';
+import { User } from '../user/user.entity';
 import { EstadoAmistad } from '../../constants/type';
 
 @Entity('amistades')
@@ -8,13 +8,13 @@ export class Amistad {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @ManyToOne(() => Usuario, (user) => user.solicitudesAmistadEnviadas, { onDelete: 'CASCADE' })
+    @ManyToOne(() => User, (user) => user.solicitudesAmistadEnviadas, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'solicitante_id' })
-    solicitante: Usuario;
+    solicitante: User;
 
-    @ManyToOne(() => Usuario, (user) => user.solicitudesAmistadRecibidas, { onDelete: 'CASCADE' })
+    @ManyToOne(() => User, (user) => user.solicitudesAmistadRecibidas, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'destinatario_id' })
-    destinatario: Usuario;
+    destinatario: User;
 
     @Column({
         type: 'varchar',
