@@ -11,8 +11,8 @@ export const ReviewService = {
         if (idCalificador === idCalificado) throw new Error("Un jugador no puede calificarse a sí mismo.");
         return await createReview(datos);
     },
-    obtenerRankingJugador: async (usuarioId: number) => {
-        if (!usuarioId) throw new Error("El ID del jugador es obligatorio.");
-        return await getAverageRating(usuarioId);
+    obtenerRankingJugador: async (userId: number) => {
+        if (!userId) throw new Error("El ID del jugador es obligatorio.");
+        return await getAverageRating(userId);
     }
 };
