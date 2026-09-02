@@ -1,12 +1,12 @@
-import { Router } from "express";
-import { UserController } from "./user.controller";
-import { validateSchema } from "../../middlewares/validate.middleware";
-import { registerSchema, loginSchema } from "./user.schema";
+import { Router } from 'express';
+import * as userController from "./user.controller";
 
 const router = Router();
-const userController = new UserController();
 
-router.post("/register", validateSchema(registerSchema), userController.register);
-router.post("/login", validateSchema(loginSchema), userController.login);
+
+//GET /api/users
+// en frontend: fetch('/api/users?nombre=manuComandante')
+router.get("/", userController.searchPlayers);
+
 
 export default router;
