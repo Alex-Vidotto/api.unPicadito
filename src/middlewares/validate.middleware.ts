@@ -1,6 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import { AnySchema, ValidationError } from "yup";
 
+export const catchAsync = (fn: Function) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        Promise.resolve(fn(req, res, next)).catch((error) => {
+            res.status(400).json({ error: error.message });
+        });
+    };
+};
+
 export const validateSchema = (schema: AnySchema) => {
     return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
@@ -25,3 +33,4 @@ export const validateSchema = (schema: AnySchema) => {
         }
     };
 };
+

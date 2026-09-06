@@ -2,17 +2,16 @@ import express from "express";
 import dotenv from "dotenv";
 import { AppDataSource } from "./database/data-source";
 import reviewRoutes from "./modules/review/review.routes";
-import { AppDataSource } from "./database/data-source";
+import userRoutes from "./modules/user/user.routes"
 
 dotenv.config();
 
 const app = express();
-app.use("/api/reviews", reviewRoutes);
-app.use(express.json());
-
+// Middleware para paesear JSON en el req.body
+app.use(express.json())
 // Routes mounting
 app.use("/api/reviews", reviewRoutes);
-app.use("/api/users", userRoutes); // Endpoint: POST /api/users/register
+app.use("/api/users", userRoutes);
 
 const PORT = process.env.PORT || 3000;
 
