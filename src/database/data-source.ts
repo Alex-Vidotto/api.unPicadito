@@ -12,7 +12,7 @@ export const AppDataSource = new DataSource({
     port: Number(process.env.DB_PORT) || 3306,
     username: process.env.DB_USER || "root",
     password: process.env.DB_PASS || "",
-    database: process.env.DB_NAME || "picadito_db", 
+    database: process.env.DB_NAME || "un_picadito_db",
     synchronize: true,
     entities: [User, Amistad, Sala, ParticipacionSala, Review],
 });

@@ -7,7 +7,7 @@ export const ReviewService = {
         if (!estrellas || estrellas < 1 || estrellas > 5) throw new Error("La calificación debe ser entre 1 y 5 estrellas.");
         const idCalificador = typeof calificador === 'string' ? calificador : calificador?.id;
         const idCalificado = typeof calificado === 'string' ? calificado : calificado?.id;
-        
+
         if (idCalificador === idCalificado) throw new Error("Un jugador no puede calificarse a sí mismo.");
         return await createReview(datos);
     },
