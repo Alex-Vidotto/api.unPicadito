@@ -19,7 +19,11 @@
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.23.3",
     "reflect-metadata": "^0.2.2",
+<<<<<<< Updated upstream
     "typeorm": "^1.1.0",
+=======
+    "typeorm": "^1.1.1",
+>>>>>>> Stashed changes
     "zod": "^4.5.4"
   },
   "devDependencies": {
