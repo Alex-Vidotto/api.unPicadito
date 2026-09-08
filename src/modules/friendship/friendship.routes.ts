@@ -1,11 +1,16 @@
 import { Router } from "express";
-import { respondFriendship } from "./friendship.controller";
+import {
+  sendFriendshipRequest,
+  respondFriendship,
+} from "./friendship.controller";
 import { authenticateJWT } from "../../middleware/auth.middleware";
+
 const router = Router();
 
-// PATCH /friendships/:id/respond
-router.patch("/:id/respond", authenticateJWT, respondFriendship);
+// POST /friendships (UP-045)
+router.post("/", authenticateJWT, sendFriendshipRequest);
 
-//router.patch("/:id/respond", respondFriendship);
+// PATCH /friendships/:id/respond (UP-046)
+router.patch("/:id/respond", authenticateJWT, respondFriendship);
 
 export default router;
