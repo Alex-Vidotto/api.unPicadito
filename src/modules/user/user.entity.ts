@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, Index } from "typeorm";
-import { Amistad } from "../amistad/amistades.entity";
+import { FriendshipEntity } from "../friendship/friendship.entity";
 import { PosicionCancha } from "../../constants/type";
 import { Sala } from "../sala/sala.entity";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
@@ -37,11 +37,11 @@ export class User {
     @Column({ type: "decimal", precision: 3, scale: 2, default: 0.0 })
     reputacion: number;
 
-    @OneToMany(() => Amistad, (amistad) => amistad.solicitante)
-    solicitudesAmistadEnviadas: Amistad[];
+    @OneToMany(() => FriendshipEntity, (friendship) => friendship.senderId)
+    solicitudesAmistadEnviadas: FriendshipEntity[];
 
-    @OneToMany(() => Amistad, (amistad) => amistad.destinatario)
-    solicitudesAmistadRecibidas: Amistad[];
+    @OneToMany(() => FriendshipEntity, (friendship) => friendship.receiverId)
+    solicitudesAmistadRecibidas: FriendshipEntity[];
 
     @OneToMany(() => Sala, (sala) => sala.creador)
     salasCreadas: Sala[];
