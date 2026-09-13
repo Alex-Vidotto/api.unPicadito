@@ -8,7 +8,7 @@ export const findPlayers = async (filters?: { term?: string }) => {
 
   if (filters?.term) {
     query.andWhere(
-      "(user.nombre LIKE :term OR user.apellido LIKE :term OR user.nombreUsuario LIKE :term OR user.apodo LIKE :term)",
+      "(user.nombre LIKE :term OR user.apellido LIKE :term OR user.nombreUsuario LIKE :term OR user.apodo LIKE :term OR user.posicionPrincipal LIKE :term)",
       { term: `%${filters.term}%` }
     );
   }
