@@ -1,18 +1,22 @@
-import dotenv from "dotenv";
-dotenv.config();
-
-import "reflect-metadata";
 import express from "express";
+import dotenv from "dotenv";
+import cors from 'cors'; 
 import reviewRoutes from "./modules/review/review.routes";
-import friendshipRoutes from "./modules/amistad/amistad.routes";
+import userRoutes from "./modules/user/user.routes";
+import friendshipRoutes from "./modules/friendship/friendship.routes";
 import { AppDataSource } from "./database/data-source";
 
 const app = express();
-app.use("/api/reviews", reviewRoutes);
+
+// IMPORTANTE: express.json() DEBE ir ANTES de las rutas
 app.use(express.json());
-app.use("/api", friendshipRoutes);
 
 const PORT = process.env.PORT;
+
+// Registro de rutas
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/friendships", friendshipRoutes);
 
 AppDataSource.initialize()
   .then(() => {

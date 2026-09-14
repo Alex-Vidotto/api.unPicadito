@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, Index } from "typeorm";
-import { Usuario } from '../usuario/usuario.entity';
+import { User } from '../user/user.entity';
 import { ParticipacionSala } from '../participacionSala/participacionSala.entity';
 import { EstadoSala } from '../../constants/type';
 
@@ -46,9 +46,9 @@ export class Sala {
     })
     estado: EstadoSala;
 
-    @ManyToOne(() => Usuario, (user) => user.salasCreadas, { onDelete: 'RESTRICT' })
+    @ManyToOne(() => User, (user) => user.salasCreadas, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'creador_id' })
-    creador: Usuario;
+    creador: User;
 
     @OneToMany(() => ParticipacionSala, (part) => part.sala)
     participantes: ParticipacionSala[];
