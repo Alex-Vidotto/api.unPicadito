@@ -13,8 +13,10 @@ const app = express();
 // IMPORTANTE: express.json() DEBE ir ANTES de las rutas
 app.use(express.json());
 
+const PORT = process.env.PORT;
+
 // Registro de rutas
-app.use("/api/reviews", reviewRoutes); 
+app.use("/api/reviews", reviewRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/friendships", friendshipRoutes);
 
