@@ -5,8 +5,6 @@ import reviewRoutes from "./modules/review/review.routes";
 import userRoutes from "./modules/user/user.routes";
 import friendshipRoutes from "./modules/friendship/friendship.routes";
 import { AppDataSource } from "./database/data-source";
-import reviewRoutes from "./modules/review/review.routes";
-import userRoutes from "./modules/user/user.routes"
 
 const app = express();
 
