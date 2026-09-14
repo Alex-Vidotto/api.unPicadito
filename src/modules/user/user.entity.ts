@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, Index } from "typeorm";
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    UpdateDateColumn,
+    OneToMany,
+} from "typeorm";
 import { Amistad } from "../amistad/amistades.entity";
 import { PosicionCancha } from "../../constants/type";
 import { Sala } from "../sala/sala.entity";
@@ -8,58 +15,56 @@ import { Review } from "../review/review.entity";
 @Entity("usuarios")
 export class User {
     @PrimaryGeneratedColumn("increment")
-    id: number;
+    id!: number;
 
     @Column({ type: "varchar", length: 100, unique: true })
-    email: string;
+    email!: string;
 
-    @Column({ type: "varchar", length: 100, nullable: false })
-    passwordHash: string;
+    @Column({ type: "varchar", length: 100, nullable: false, select: true })
+    passwordHash!: string;
 
     @Column({ type: "varchar", length: 50, unique: true })
-    nombreUsuario: string;
+    nombreUsuario!: string;
 
     @Column({ type: "varchar", length: 100 })
-    nombre: string;
+    nombre!: string;
 
     @Column({ type: "varchar", length: 100 })
-    apellido: string;
+    apellido!: string;
 
     @Column({ type: "varchar", length: 100, nullable: true })
-    apodo: string;
+    apodo?: string;
 
     @Column({ type: "varchar", length: 255, nullable: true })
-    fotoPerfilUrl: string;
+    fotoPerfilUrl?: string;
 
     @Column({ type: "varchar", length: 30, default: "POLIFUNCIONAL" })
-    posicionPrincipal: PosicionCancha;
+    posicionPrincipal!: PosicionCancha;
 
     @Column({ type: "decimal", precision: 3, scale: 2, default: 0.0 })
-    reputacion: number;
+    reputacion!: number;
 
     @OneToMany(() => Amistad, (amistad) => amistad.solicitante)
-    solicitudesAmistadEnviadas: Amistad[];
+    solicitudesAmistadEnviadas!: Amistad[];
 
     @OneToMany(() => Amistad, (amistad) => amistad.destinatario)
-    solicitudesAmistadRecibidas: Amistad[];
+    solicitudesAmistadRecibidas!: Amistad[];
 
     @OneToMany(() => Sala, (sala) => sala.creador)
-    salasCreadas: Sala[];
+    salasCreadas!: Sala[];
 
     @OneToMany(() => ParticipacionSala, (part) => part.usuario)
-    participacion: ParticipacionSala[];
+    participacion!: ParticipacionSala[];
 
     @CreateDateColumn()
-    creadoEn: Date;
+    creadoEn!: Date;
 
     @UpdateDateColumn()
-    actualizadoEn: Date;
+    actualizadoEn!: Date;
 
     @OneToMany(() => Review, (review) => review.calificador)
-    resenasEscritas: Review[];
+    resenasEscritas!: Review[];
 
     @OneToMany(() => Review, (review) => review.calificado)
-    resenasRecibidas: Review[];
-
-
+    resenasRecibidas!: Review[];
 }
