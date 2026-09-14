@@ -12,6 +12,8 @@ app.use("/api/reviews", reviewRoutes);
 app.use(express.json());
 app.use("/api", friendshipRoutes);
 
+const PORT = process.env.PORT;
+
 AppDataSource.initialize()
   .then(() => {
     console.log("Base de datos conectada");
