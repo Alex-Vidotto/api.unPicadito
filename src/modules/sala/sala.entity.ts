@@ -39,6 +39,10 @@ export class Sala {
     @Column({ type: 'varchar', length: 64, unique: true })
     tokenInvitacion: string;
 
+    @Column({ type: 'point', srid: 4326 })
+    @Index({ spatial: true })
+    ubicacion: { x: number, y: number };
+
     @Column({
         type: 'varchar',
         length: 20,
