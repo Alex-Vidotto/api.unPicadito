@@ -8,10 +8,10 @@ export class Review {
     id: string;
 
     @Column({ type: 'int' })
-    estrellas: number; 
+    estrellas: number;
 
     @Column({ type: 'text', nullable: true })
-    comentario: string; 
+    comentario: string;
 
     @ManyToOne(() => User, (user) => user.resenasEscritas, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'calificador_id' })
