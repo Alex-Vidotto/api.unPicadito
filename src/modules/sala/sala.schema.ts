@@ -1,17 +1,38 @@
-import * as yup from "yup";
+import { z } from "zod";
 
-export const crearSalaSchema = yup.object({
-    nombre: yup.string().required("El nombre de la sala es requerido").max(30),
-    descripcion: yup.string().nullable().max(250),
-    nombreCancha: yup.string().required().max(30),
-    direccion: yup.string().required().max(100),
-    fechaHoraPartido: yup.date().min(new Date(), "Fecha actual o futura").required(),
-    cuposTotales: yup.number().integer().min(10).default(10),
-    permiteSumplentes: yup.boolean().default(true),
-    cuposSumplentesMax: yup.number().integer().default(4).max(20),
-    esPublica: yup.boolean().default(true),
-    ubicacion: yup.object({
-        x: yup.number().required(),
-        y: yup.number().required()
-    }).required()
+export const buscarSalasQuerySchema = z.object({
+    lat: z.coerce.number({ message: "Latitud debe ser un número" }).optional(),
+    lng: z.coerce.number({ message: "Longitud debe ser un número" }).optional(),
+    radioKm: z.coerce.number().positive().default(10),
+    
+    fechaInicio: z.coerce.date().optional(),
+    fechaFin: z.coerce.date().optional(),
+    
+    estadoDisponibilidad: z.enum(['DISPONIBLES', 'LLENAS', 'TODAS']).default('TODAS'),
+    
+    esPublica: z.coerce.boolean().optional(),
+    permiteSuplentes: z.coerce.boolean().optional(),
+    
+    // TODO: Descomentar cuando el módulo de amigos esté listo
+    // soloAmigos: z.coerce.boolean().default(false)
 });
+
+// Schema para crear una sala
+export const crearSalaBodySchema = z.object({
+    nombre: z.string().min(3).max(50),
+    descripcion: z.string().optional(),
+    nombreCancha: z.string().min(3).max(50),
+    direccion: z.string().min(5).max(100),
+    fechaHoraPartido: z.coerce.date(),
+    cuposTotales: z.number().int().positive().default(10),
+    permiteSuplentes: z.boolean().default(true),
+    cuposSuplentesMax: z.number().int().min(0).default(4),
+    esPublica: z.boolean().default(true),
+    ubicacion: z.object({
+        x: z.number(), // longitud
+        y: z.number()  // latitud
+    })
+});
+
+export type BuscarSalasQuery = z.infer<typeof buscarSalasQuerySchema>;
+export type CrearSalaBody = z.infer<typeof crearSalaBodySchema>;

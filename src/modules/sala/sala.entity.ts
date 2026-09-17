@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, Index } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, Index, BeforeInsert } from "typeorm";
 import { User } from '../user/user.entity';
 import { ParticipacionSala } from '../participacionSala/participacionSala.entity';
 import { EstadoSala } from '../../constants/type';
+import crypto from "crypto";
 
 @Entity('salas')
 export class Sala {
@@ -38,6 +39,12 @@ export class Sala {
 
     @Column({ type: 'varchar', length: 64, unique: true })
     tokenInvitacion: string;
+    @BeforeInsert()
+    generateToken() {
+        if (!this.tokenInvitacion) {
+            this.tokenInvitacion = crypto.randomBytes(16).toString('hex');
+        }
+    }
 
     @Column({ type: 'point', srid: 4326 })
     @Index({ spatial: true })

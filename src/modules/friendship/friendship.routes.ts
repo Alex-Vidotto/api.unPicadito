@@ -3,7 +3,7 @@ import {
   sendFriendshipRequest,
   respondFriendship,
 } from "./friendship.controller";
-import { authenticateJWT } from "../../middleware/auth.middleware";
+import { authenticateJWT } from "../../middlewares/auth.middleware";
 
 const router = Router();
 

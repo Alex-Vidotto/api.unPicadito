@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { sendFriendRequest } from "../controllers/friendController";
-import { authenticateJWT } from "../middlewares/authMiddleware";
+import { authenticateJWT } from "../middlewares/auth.middleware";
 
 const router = Router();
 
