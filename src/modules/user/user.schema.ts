@@ -1,24 +1,24 @@
-import * as yup from "yup";
+import { z } from "zod";
 
-export const registerSchema = yup.object({
-    nombre: yup.string().trim().required("First name is required"),
-    apellido: yup.string().trim().required("Last name is required"),
-    nombreUsuario: yup.string().trim().required("Username is required"),
-    email: yup.string().email("Invalid email format").trim().required("Email is required"),
-    password: yup.string().min(6, "Password must be at least 6 characters long").required("Password is required"),
-    passwordConfirm: yup.string()
-        .oneOf([yup.ref('password')], 'Passwords do not match')
-        .required("Password confirmation is required"),
-    apodo: yup.string().trim().optional(),
-    fotoPerfilUrl: yup.string().url("Must be a valid URL").trim().optional(),
+export const registerSchema = z.object({
+    nombre: z.string().trim().min(1, "First name is required"),
+    apellido: z.string().trim().min(1, "Last name is required"),
+    nombreUsuario: z.string().trim().min(1, "Username is required"),
+    email: z.string().trim().email("Invalid email format"),
+    password: z.string().min(6, "Password must be at least 6 characters long"),
+    passwordConfirm: z.string().min(1, "Password confirmation is required"),
+    apodo: z.string().trim().optional(),
+    fotoPerfilUrl: z.string().trim().url("Must be a valid URL").optional(),
+}).refine((data) => data.password === data.passwordConfirm, {
+    message: "Passwords do not match",
+    path: ["passwordConfirm"], // El error aparecerá específicamente en este campo
 });
 
-export const loginSchema = yup.object({
-    email: yup.string().email("Invalid email format").trim().optional(),
-    nombreUsuario: yup.string().trim().optional(),
-    password: yup.string().required("Password is required"),
-}).test(
-    'at-least-one-identifier',
-    'Email or username is required',
-    (value) => !!(value.email || value.nombreUsuario)
-);
+export const loginSchema = z.object({
+    email: z.string().trim().email("Invalid email format").optional(),
+    nombreUsuario: z.string().trim().optional(),
+    password: z.string().min(1, "Password is required"),
+}).refine((data) => !!(data.email || data.nombreUsuario), {
+    message: "Email or username is required",
+    path: ["email"], // Si falta, el error lo marcará acá
+});
