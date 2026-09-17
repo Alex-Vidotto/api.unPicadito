@@ -1,32 +1,42 @@
-import "reflect-metadata";
-import express from "express";
-import cors from "cors";
+import express, { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
+import cors from 'cors';
+import reviewRoutes from "./modules/review/review.routes";
+import userRoutes from "./modules/user/user.routes";
+import friendshipRoutes from "./modules/friendship/friendship.routes";
+import salaRoutes from "./modules/sala/sala.routes";
+import { AppDataSource } from "./database/data-source";
 
-// Configurar variables de entorno (.env)
 dotenv.config();
 
 const app = express();
 
-// Middlewares fundamentales
-app.use(cors()); // Permite que tu frontend (React) se conecte sin problemas de CORS
-app.use(express.json()); // Permite que Express entienda el formato JSON que envía React
+app.use(express.json());
+app.use(cors());
 
-// Ruta de prueba para saber si el backend responde en el navegador
-app.get("/", (req, res) => {
-  res.send("¡El backend de unPicadito está funcionando perfectamente!");
+// Registro de rutas
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/friendships", friendshipRoutes);
+app.use("/api/salas", salaRoutes);
+
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error("Error capturado:", err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+        success: false,
+        message: err.message || "Error interno del servidor",
+    });
 });
 
-// Aquí irán tus rutas reales más adelante, por ejemplo:
-// import authRoutes from "./routes/auth.routes";
-// app.use("/api/auth", authRoutes);
-
-// Definir el puerto (usará el del archivo .env o el 3000 por defecto)
-const PORT = process.env.PORT || 3000;
-
-// Iniciar el servidor de Express
-app.listen(PORT, () => {
-  console.log(`=========================================`);
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`=========================================`);
-});
+AppDataSource.initialize()
+  .then(() => {
+    console.log("Base de datos conectada");
+    app.listen(process.env.PORT || 8080, () => {
+      console.log(`Servidor en puerto ${process.env.PORT || 8080}`);
+    });
+  })
+  .catch((err: Error) => {
+    console.error("Error al conectar:", err);
+    process.exit(1);
+  });
