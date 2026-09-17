@@ -1,5 +1,5 @@
-import { AppDataSource } from "../../../database/data-source"; // Ajusta los niveles de carpeta si es necesario
-import { User } from "./user.entity"; // O la ruta donde esté tu entidad de Usuario
+import { AppDataSource } from "../../../database/data-source"; //la ruta del data-source
+import { User } from "./user.entity"; //la ruta donde está tu entidad de Usuario
 
 // ... (aquí debe estar tu función existente searchPlayers)
 
