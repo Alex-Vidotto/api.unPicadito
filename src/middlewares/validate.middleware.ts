@@ -1,36 +1,48 @@
 import { Request, Response, NextFunction } from "express";
-import { AnySchema, ValidationError } from "yup";
+import { ZodSchema, ZodError } from "zod";
 
-export const catchAsync = (fn: Function) => {
-    return (req: Request, res: Response, next: NextFunction) => {
-        Promise.resolve(fn(req, res, next)).catch((error) => {
-            res.status(400).json({ error: error.message });
-        });
-    };
-};
-
-export const validateSchema = (schema: AnySchema) => {
-    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const validateMiddleware = (
+    schema: ZodSchema,
+    target: "body" | "query" | "params" = "body",
+) => {
+    return async (
+        req: Request,
+        res: Response,
+        next: NextFunction,
+    ): Promise<void> => {
         try {
-            // Validamos y sanitizamos (ej: hacer trim a los strings)
-            // Sobrescribimos req.body con los datos ya limpios
-            req.body = await schema.validate(req.body, {
-                abortEarly: false,
-                stripUnknown: true
-            });
+            // Validamos con Zod y sobreescribimos los datos
+            const parsed = await schema.parseAsync(req[target]);
+            // req.query es readonly en Express v5, usamos Object.assign para mutarlo
+            if (target === "query") {
+                Object.assign(req.query, parsed);
+            } else {
+                req[target] = parsed;
+            }
             next();
         } catch (error: any) {
-            if (error instanceof ValidationError) {
-                // Extraemos solo los mensajes de error de Yup
-                const errors = error.inner.map((err) => ({
-                    field: err.path,
-                    message: err.message
-                }));
-                res.status(400).json({ message: "Validation error", errors });
+            console.error(
+                "🔴 Error capturado en validación:",
+                error?.name,
+                error?.message,
+            );
+            if (error instanceof ZodError || error?.name === "ZodError") {
+                res.status(400).json({
+                    message: "Error de validación",
+                    errors: error.issues.map((err: any) => ({
+                        field: err.path.join("."),
+                        message: err.message,
+                    })),
+                });
                 return;
             }
-            res.status(500).json({ message: "Internal validation error" });
+            res.status(500).json({ message: "Error interno de validación" });
         }
     };
 };
 
+export const catchAsync = (fn: Function) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+    };
+};

@@ -16,3 +16,4 @@ export const AppDataSource = new DataSource({
     synchronize: true,
     entities: [User, FriendshipEntity, Sala, ParticipacionSala, Review],
 });
+
