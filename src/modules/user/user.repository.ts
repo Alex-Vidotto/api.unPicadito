@@ -41,3 +41,38 @@ export const findPlayers = async (filters?: { term?: string }) => {
     return await query.getMany();
 };
 
+export const findUserById = async (id: number) => {
+  return await getRepo().createQueryBuilder("user")
+    .select([
+      "user.id",
+      "user.nombre",
+      "user.apellido",
+      "user.nombreUsuario",
+      "user.apodo",
+      "user.email", 
+      "user.fotoPerfilUrl",
+      "user.posicionPrincipal",
+      "user.reputacion",
+      "user.creadoEn"
+    ])
+    .where("user.id = :id", { id })
+    .getOne();
+};
+
+
+export const findPublicUserById = async (id: number) => {
+  return await getRepo().createQueryBuilder("user")
+    .select([
+      "user.id",
+      "user.nombre",
+      "user.apellido",
+      "user.nombreUsuario",
+      "user.apodo",
+      "user.fotoPerfilUrl",
+      "user.posicionPrincipal",
+      "user.reputacion",
+      "user.creadoEn"
+    ])
+    .where("user.id = :id", { id })
+    .getOne();
+};

@@ -18,3 +18,22 @@ export const searchPlayers = catchAsync(async (req: Request, res: Response) => {
     const players = await userService.searchPlayers(term);
     res.status(200).json(players);
 });
+
+export const getUserProfile = catchAsync(async (req: Request, res: Response) => {
+    const userId = req.user!.id; 
+
+    const profile = await userService.getUserProfile(userId);
+    res.status(200).json(profile);
+});
+
+export const getPublicProfile = catchAsync(async (req: Request, res: Response) => {
+    const idParam = String(req.params.id);
+    const userId = parseInt(idParam, 10);
+
+    if (isNaN(userId)) {
+        return res.status(400).json({ error: "El ID del jugador debe ser un número válido." });
+    }
+
+    const profile = await userService.getPublicUserProfile(userId);
+    res.status(200).json(profile);
+});
