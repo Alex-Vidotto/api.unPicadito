@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import * as userRepository from './user.repository';
+import { findPlayers, findUserById, findPublicUserById } from './user.repository.js';
 
 export interface RegisterDto {
     email: string;
@@ -10,6 +11,13 @@ export interface RegisterDto {
     nombre: string;
     apellido: string;
     apodo?: string;
+}
+
+export interface UpdateProfileDto {
+    nombre?: string;
+    apellido?: string;
+    apodo?: string;
+    fotoPerfilUrl?: string;
 }
 
 // Corregido: El Partial solo afecta a email y nombreUsuario. El password queda obligatorio.
@@ -67,4 +75,38 @@ export const searchPlayers = async (searchTerm?: string) => {
     if (cleanTerm && cleanTerm.length < 2) throw new Error("El término de búsqueda debe tener al menos 2 caracteres.");
 
     return await userRepository.findPlayers({ term: cleanTerm });
+};
+
+export const getUserProfile = async (userId: number) => {
+  const user = await findUserById(userId);
+  
+  if (!user) {
+    throw new Error("Usuario no encontrado");
+  }
+  
+  return user;
+};
+
+export const getPublicUserProfile = async (userId: number) => {
+  const user = await findPublicUserById(userId);
+  
+  if (!user) {
+    throw new Error("Jugador no encontrado");
+  }
+  
+  return user;
+};
+
+export const updateUserProfile = async (userId: number, dto: UpdateProfileDto) => {
+    const user = findUserById(userId);
+    if (!user) throw Error("Usuario no encontrado.");
+
+    const updateData: Partial<UpdateProfileDto> = {};
+    if (dto.nombre !== undefined) updateData.nombre = dto.nombre.trim();
+    if (dto.apellido !== undefined) updateData.apellido = dto.apellido.trim();
+    if (dto.apodo !== undefined) updateData.apodo = dto.apodo.trim();
+    if (dto.fotoPerfilUrl !== undefined) updateData.fotoPerfilUrl = dto.fotoPerfilUrl.trim();
+
+    const updatedUser = await userRepository.updateUser(userId, updateData);
+    return updatedUser;
 };
