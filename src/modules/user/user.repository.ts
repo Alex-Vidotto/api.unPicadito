@@ -76,3 +76,23 @@ export const findPublicUserById = async (id: number) => {
     .where("user.id = :id", { id })
     .getOne();
 };
+
+export const updateUser = async (userId: number, updateData: any) => {
+    const userRepository.update(userId, updateData);
+
+    const updatedUser = await userRepository.findOne({
+        where: { id: userId },
+        select: [
+            'id',
+            'email',
+            'nombreUsuario',
+            'nombre',
+            'apellido',
+            'apodo',
+            'fotoPerfilUrl',
+            'posicionPrincipal',
+            'reputacion',
+        ]
+    });
+    return updatedUser;
+}
