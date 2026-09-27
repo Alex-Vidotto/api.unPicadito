@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as userController from "./user.controller";
 import { validateMiddleware } from '../../middlewares/validate.middleware';
 import { registerSchema, loginSchema } from './user.schema';
-import { authenticateJWT } from "../../middleware/auth.middleware"; 
+import { authenticateJWT } from "../../middlewares/auth.middleware"; 
 
 const router = Router();    
 

@@ -21,12 +21,12 @@ export const searchPlayers = catchAsync(async (req: Request, res: Response) => {
 
 export const getUserProfile = catchAsync(async (req: Request, res: Response) => {
     const userId = req.user!.id; 
-
     const profile = await userService.getUserProfile(userId);
     res.status(200).json(profile);
 });
 
 export const getPublicProfile = catchAsync(async (req: Request, res: Response) => {
+    
     const idParam = String(req.params.id);
     const userId = parseInt(idParam, 10);
 

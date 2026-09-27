@@ -23,7 +23,7 @@ export const authenticateJWT = (req: Request, res: Response, next: NextFunction)
 
   try {
     // Reemplaza 'TU_CLAVE_SECRETA' por process.env.JWT_SECRET o tu clave actual
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'TU_CLAVE_SECRETA') as { id: number };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "mi_secreto_unico_compartido") as { id: number };
     
     // Inyectamos el usuario en la request
     req.user = { id: decoded.id };
