@@ -25,8 +25,8 @@ export const getUserProfile = catchAsync(async (req: Request, res: Response) => 
     res.status(200).json(profile);
 });
 
+
 export const getPublicProfile = catchAsync(async (req: Request, res: Response) => {
-    
     const idParam = String(req.params.id);
     const userId = parseInt(idParam, 10);
 
@@ -35,5 +35,15 @@ export const getPublicProfile = catchAsync(async (req: Request, res: Response) =
     }
 
     const profile = await userService.getPublicUserProfile(userId);
+
+    if (profile && profile.resenasRecibidas) {
+        profile.resenasRecibidas = profile.resenasRecibidas.map((resena: any) => {
+            if (resena.calificador) {
+                delete resena.calificador.passwordHash;
+            }
+            return resena;
+        });
+    }
+
     res.status(200).json(profile);
 });
