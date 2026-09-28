@@ -21,3 +21,14 @@ export const getAverageRating = async (calificadoId: number) => {
     totalResenas: parseInt(result.total_resenas) || 0
   };
 };
+
+
+export const getReviewsByCalificadoId = async (calificadoId: number) => {
+  return await repo().find({
+    where: { calificado: { id: calificadoId } },
+    relations: {
+      calificador: true,
+    },
+    order: { creadoEn: 'DESC' },
+  });
+};
