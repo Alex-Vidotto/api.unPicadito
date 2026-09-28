@@ -18,7 +18,7 @@ export type LoginDto = Partial<Pick<RegisterDto, "email" | "nombreUsuario">> & P
 
 // --- HELPER INTERNO (DRY) ---
 const generateAuthResponse = (user: any) => {
-    const secret = process.env.JWT_SECRET || "secreto_desarrollo_temporal";
+    const secret = process.env.JWT_SECRET || "mi_secreto_unico_compartido";
     const token = jwt.sign(
         { id: user.id, email: user.email, nombreUsuario: user.nombreUsuario },
         secret,

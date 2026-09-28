@@ -21,10 +21,10 @@ export const searchPlayers = catchAsync(async (req: Request, res: Response) => {
 
 export const getUserProfile = catchAsync(async (req: Request, res: Response) => {
     const userId = req.user!.id; 
-
     const profile = await userService.getUserProfile(userId);
     res.status(200).json(profile);
 });
+
 
 export const getPublicProfile = catchAsync(async (req: Request, res: Response) => {
     const idParam = String(req.params.id);
@@ -35,5 +35,15 @@ export const getPublicProfile = catchAsync(async (req: Request, res: Response) =
     }
 
     const profile = await userService.getPublicUserProfile(userId);
+
+    if (profile && profile.resenasRecibidas) {
+        profile.resenasRecibidas = profile.resenasRecibidas.map((resena: any) => {
+            if (resena.calificador) {
+                delete resena.calificador.passwordHash;
+            }
+            return resena;
+        });
+    }
+
     res.status(200).json(profile);
 });

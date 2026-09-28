@@ -55,24 +55,33 @@ export const findUserById = async (id: number) => {
       "user.reputacion",
       "user.creadoEn"
     ])
+    .leftJoinAndSelect("user.resenasRecibidas", "resenas") 
+    .leftJoinAndSelect("resenas.calificador", "calificador")
+
     .where("user.id = :id", { id })
     .getOne();
 };
 
 
 export const findPublicUserById = async (id: number) => {
-  return await getRepo().createQueryBuilder("user")
-    .select([
-      "user.id",
-      "user.nombre",
-      "user.apellido",
-      "user.nombreUsuario",
-      "user.apodo",
-      "user.fotoPerfilUrl",
-      "user.posicionPrincipal",
-      "user.reputacion",
-      "user.creadoEn"
-    ])
-    .where("user.id = :id", { id })
-    .getOne();
+  return await getRepo().findOne({
+    where: { id },
+    select: {
+      id: true,
+      nombre: true,
+      apellido: true,
+      nombreUsuario: true,
+      apodo: true,
+      email: true,
+      fotoPerfilUrl: true,
+      posicionPrincipal: true,
+      reputacion: true,
+      creadoEn: true,
+    },
+    relations: {
+      resenasRecibidas: {
+        calificador: true,
+      },
+    },
+  });
 };
