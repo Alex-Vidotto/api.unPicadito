@@ -13,6 +13,13 @@ export interface RegisterDto {
     apodo?: string;
 }
 
+export interface UpdateProfileDto {
+    nombre?: string;
+    apellido?: string;
+    apodo?: string;
+    fotoPerfilUrl?: string;
+}
+
 // Corregido: El Partial solo afecta a email y nombreUsuario. El password queda obligatorio.
 export type LoginDto = Partial<Pick<RegisterDto, "email" | "nombreUsuario">> & Pick<RegisterDto, "password">;
 
@@ -88,4 +95,18 @@ export const getPublicUserProfile = async (userId: number) => {
   }
   
   return user;
+};
+
+export const updateUserProfile = async (userId: number, dto: UpdateProfileDto) => {
+    const user = findUserById(userId);
+    if (!user) throw Error("Usuario no encontrado.");
+
+    const updateData: Partial<UpdateProfileDto> = {};
+    if (dto.nombre !== undefined) updateData.nombre = dto.nombre.trim();
+    if (dto.apellido !== undefined) updateData.apellido = dto.apellido.trim();
+    if (dto.apodo !== undefined) updateData.apodo = dto.apodo.trim();
+    if (dto.fotoPerfilUrl !== undefined) updateData.fotoPerfilUrl = dto.fotoPerfilUrl.trim();
+
+    const updatedUser = await userRepository.updateUser(userId, updateData);
+    return updatedUser;
 };
