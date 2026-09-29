@@ -70,3 +70,19 @@ export const crearNuevaSala = async (data: CrearSalaBody, userId: number) => {
     
     return await baseSalaRepo.save(nuevaSala);
 };
+
+export const obtenerSalaConCreador = async (salaId: string) => {
+    return await baseSalaRepo.findOne({
+        where: { id: salaId },
+        relations: {
+            creador: true,
+        },
+    });
+};
+
+export const cancelarSalaEnBD = async (salaId: string, motivo: string) => {
+    await baseSalaRepo.update(salaId, {
+        estado: "CANCELADA",
+        motivoCancelacion: motivo,
+    });
+};

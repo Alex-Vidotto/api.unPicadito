@@ -31,7 +31,6 @@ export const buscarSalasQuerySchema = z.object({
     // soloAmigos: z.coerce.boolean().default(false)
 });
 
-// Schema para crear una sala
 export const crearSalaBodySchema = z.object({
     nombre: z.string().min(3).max(50),
     descripcion: z.string().optional(),
@@ -48,8 +47,19 @@ export const crearSalaBodySchema = z.object({
     })
 });
 
-
+export const cancelarSalaBodySchema = z.object({
+    motivoCancelacion: z
+    .string({
+        error: (issue) =>
+            issue.input === undefined
+                ? { message: "El motivo de la cancelacion es obligatorio" }
+                : { message: "El motivo debe ser un texto" },
+    })
+    .min(10, "Debe tener minimo 10 caracteres")
+    .max(500, "No debe de superar los 500 caracteres"),
+});
 
 export type booleanQuery = z.infer<typeof booleanQuery>;
 export type BuscarSalasQuery = z.infer<typeof buscarSalasQuerySchema>;
 export type CrearSalaBody = z.infer<typeof crearSalaBodySchema>;
+export type CancelarSalaBody = z.infer<typeof cancelarSalaBodySchema>;
