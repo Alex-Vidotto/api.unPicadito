@@ -1,4 +1,4 @@
-import { buscarSalasConFiltros, crearNuevaSala, obtenerSalaConCreador, cancelarSalaEnBD } from "./sala.repository";
+import { buscarSalasConFiltros, crearNuevaSala, obtenerSalaConCreador, cambiarEstadoSalaEnBD } from "./sala.repository";
 import { BuscarSalasQuery, CrearSalaBody } from "./sala.schema";
 
 // TODO: Descomentar cuando el módulo de amigos esté listo
@@ -25,7 +25,7 @@ export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
     return nuevaSala;
 };
 
-export const cancelarSalaService = async ( salaId: string, userId: number, motivo: string ) => {
+export const cambiarEstadoSalaService = async ( salaId: string, userId: number, motivo: string ) => {
     const sala = await obtenerSalaConCreador(salaId);
 
     if (!sala) throw new Error("Sala no encontrada");
@@ -38,7 +38,7 @@ export const cancelarSalaService = async ( salaId: string, userId: number, motiv
         throw new Error(`La sala se encuentra ${sala.estado}`);
     }
 
-    await cancelarSalaEnBD(salaId, motivo);
+    await cambiarEstadoSalaEnBD(salaId, motivo);
 
     return { mensaje: 'Sala cancelada correctamente' };
 };

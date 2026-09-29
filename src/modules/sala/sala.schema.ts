@@ -47,7 +47,7 @@ export const crearSalaBodySchema = z.object({
     })
 });
 
-export const cancelarSalaBodySchema = z.object({
+export const cambiarEstadoSalaBodySchema = z.object({
     motivoCancelacion: z
     .string({
         error: (issue) =>
@@ -62,4 +62,4 @@ export const cancelarSalaBodySchema = z.object({
 export type booleanQuery = z.infer<typeof booleanQuery>;
 export type BuscarSalasQuery = z.infer<typeof buscarSalasQuerySchema>;
 export type CrearSalaBody = z.infer<typeof crearSalaBodySchema>;
-export type CancelarSalaBody = z.infer<typeof cancelarSalaBodySchema>;
+export type EliminarSalaBody = z.infer<typeof cambiarEstadoSalaBodySchema>;

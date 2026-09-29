@@ -80,7 +80,7 @@ export const obtenerSalaConCreador = async (salaId: string) => {
     });
 };
 
-export const cancelarSalaEnBD = async (salaId: string, motivo: string) => {
+export const cambiarEstadoSalaEnBD = async (salaId: string, motivo: string) => {
     await baseSalaRepo.update(salaId, {
         estado: "CANCELADA",
         motivoCancelacion: motivo,

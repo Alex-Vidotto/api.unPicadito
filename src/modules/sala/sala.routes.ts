@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { getSalasController, postSalaController, cancelarSalaController } from "./sala.controller";
+import { getSalasController, postSalaController, cambiarEstadoSalaController } from "./sala.controller";
 import { authenticateJWT } from "../../middlewares/auth.middleware";
 import { validateMiddleware, catchAsync } from "../../middlewares/validate.middleware"; 
-import { buscarSalasQuerySchema, crearSalaBodySchema, cancelarSalaBodySchema } from "./sala.schema";
+import { buscarSalasQuerySchema, crearSalaBodySchema, cambiarEstadoSalaBodySchema } from "./sala.schema";
 
 const router = Router();
 
@@ -24,8 +24,8 @@ router.post(
 router.patch(
     "/:id/cancelar",
     authenticateJWT,
-    validateMiddleware(cancelarSalaBodySchema, 'body'),
-    cancelarSalaController
+    validateMiddleware(cambiarEstadoSalaBodySchema, 'body'),
+    cambiarEstadoSalaController
 );
 
 export default router;

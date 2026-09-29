@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { buscarSalas, crearSalaService, cancelarSalaService } from "./sala.service";
-import { buscarSalasQuerySchema, CrearSalaBody, CancelarSalaBody } from "./sala.schema";
+import { buscarSalas, crearSalaService, cambiarEstadoSalaService } from "./sala.service";
+import { buscarSalasQuerySchema, CrearSalaBody, EliminarSalaBody } from "./sala.schema";
 
 export const getSalasController = async (req: Request, res: Response) => {
     const filtros = buscarSalasQuerySchema.parse(req.query);
@@ -32,7 +32,7 @@ export const postSalaController = async (req: Request, res: Response) => {
     });
 };
 
-export const cancelarSalaController = async (req: Request, res: Response) => {
+export const cambiarEstadoSalaController = async (req: Request, res: Response) => {
     try {
         const id = req.params.id;
         
@@ -44,13 +44,13 @@ export const cancelarSalaController = async (req: Request, res: Response) => {
         }
 
         const userId = req.user?.id;
-        const { motivoCancelacion } = req.body as CancelarSalaBody;
+        const { motivoCancelacion } = req.body as EliminarSalaBody;
 
         if (!userId) {
             return res.status(401).json({ message: 'No autorizado' });
         }
 
-        const resultado = await cancelarSalaService(id, userId, motivoCancelacion);
+        const resultado = await cambiarEstadoSalaService(id, userId, motivoCancelacion);
         res.status(200).json({
             success: true,
             data: resultado
