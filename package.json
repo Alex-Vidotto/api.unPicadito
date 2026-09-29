@@ -19,6 +19,7 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.24.3",
+    "qs": "^6.16.0",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^1.1.1",
     "yup": "^1.7.1",

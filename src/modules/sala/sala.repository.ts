@@ -7,7 +7,8 @@ export const baseSalaRepo = AppDataSource.getRepository(Sala);
 export const buscarSalasConFiltros = async (filtros: BuscarSalasQuery, amigosIds: number[] = []) => {
     const { 
         lat, lng, radioKm, fechaInicio, fechaFin, esPublica, 
-        permiteSuplentes, estadoDisponibilidad 
+        permiteSuplentes, estadoDisponibilidad ,
+        nombre, nombreCancha
         // TODO: Descomentar cuando el módulo de amigos esté listo
         // soloAmigos 
     } = filtros;
@@ -20,8 +21,21 @@ export const buscarSalasConFiltros = async (filtros: BuscarSalasQuery, amigosIds
         .leftJoin("sala.participantes", "participacion")
         .where("sala.estado = :estado", { estado: "ABIERTA" });
 
-    if (esPublica !== undefined) query.andWhere("sala.esPublica = :esPublica", { esPublica });
-    if (permiteSuplentes !== undefined) query.andWhere("sala.permiteSuplentes = :permiteSuplentes", { permiteSuplentes });
+    if (nombre) query.andWhere("sala.nombre LIKE :nombre", { nombre: `%${nombre}%` });
+    if (nombreCancha) query.andWhere("sala.nombreCancha LIKE :nombreCancha", { nombreCancha: `%${nombreCancha}%` });
+
+    if (esPublica !== undefined) {
+        query.andWhere("sala.esPublica = :esPublica", {
+            esPublica,
+        });
+    }
+
+    if (permiteSuplentes !== undefined) {
+        query.andWhere("sala.permiteSuplentes = :permiteSuplentes", {
+            permiteSuplentes,
+        });
+    }
+    
     if (fechaInicio) query.andWhere("sala.fechaHoraPartido >= :fechaInicio", { fechaInicio });
     if (fechaFin) query.andWhere("sala.fechaHoraPartido <= :fechaFin", { fechaFin });
     

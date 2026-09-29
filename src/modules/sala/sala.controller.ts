@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { buscarSalas, crearSalaService } from "./sala.service";
-import { BuscarSalasQuery, CrearSalaBody } from "./sala.schema";
+import { buscarSalasQuerySchema, CrearSalaBody } from "./sala.schema";
 
 export const getSalasController = async (req: Request, res: Response) => {
-    const filtros = req.query as unknown as BuscarSalasQuery;
+    const filtros = buscarSalasQuerySchema.parse(req.query);
     const userId = req.user?.id; 
 
     // userId ahora está tipado como number

@@ -9,7 +9,6 @@ const router = Router();
 // Endpoint: GET /api/salas/buscar
 router.get(
     "/buscar",
-    authenticateJWT, 
     validateMiddleware(buscarSalasQuerySchema, 'query'), 
     catchAsync(getSalasController) 
 );

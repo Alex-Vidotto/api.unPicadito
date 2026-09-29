@@ -16,13 +16,7 @@ export const buscarSalas = async (filtros: BuscarSalasQuery, userId: number) => 
 
     const salas = await buscarSalasConFiltros(filtros, amigosIds);
 
-    if (!salas || salas.length === 0) {
-        const error = new Error("No se encontraron salas que coincidan con los filtros aplicados.");
-        (error as any).status = 404; 
-        throw error;
-    }
-
-    return salas;
+    return salas ?? [];
 };
 
 // Crear sala
