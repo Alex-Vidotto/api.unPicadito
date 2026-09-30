@@ -59,7 +59,12 @@ export const cambiarEstadoSalaBodySchema = z.object({
     .max(500, "No debe de superar los 500 caracteres"),
 });
 
+export const leaveSalaSchema = z.object({
+    id: z.string().uuid({ message: "El ID de la sala no tiene un formato UUID válido." }),
+});
+
 export type booleanQuery = z.infer<typeof booleanQuery>;
 export type BuscarSalasQuery = z.infer<typeof buscarSalasQuerySchema>;
 export type CrearSalaBody = z.infer<typeof crearSalaBodySchema>;
 export type EliminarSalaBody = z.infer<typeof cambiarEstadoSalaBodySchema>;
+export type LeaveSalaParams = z.infer<typeof leaveSalaSchema>;

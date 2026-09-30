@@ -1,64 +1,37 @@
-import { Request, Response } from "express";
-import { buscarSalas, crearSalaService, cambiarEstadoSalaService } from "./sala.service";
-import { buscarSalasQuerySchema, CrearSalaBody, EliminarSalaBody } from "./sala.schema";
+import { CrearSalaBody, EliminarSalaBody, buscarSalasQuerySchema } from "./sala.schema";
+import { buscarSalas, crearSalaService, cambiarEstadoSalaService, unirseSalaService, leaveSalaService } from "./sala.service";
+import { asyncHandler } from "../../middlewares/error.middleware";
+import { obtenerIdParam, obtenerUserId } from "../../common/request.helpers";
 
-export const getSalasController = async (req: Request, res: Response) => {
+export const getSalasController = asyncHandler(async (req, res) => {
     const filtros = buscarSalasQuerySchema.parse(req.query);
-    const userId = req.user?.id;
+    const salas = await buscarSalas(filtros, obtenerUserId(req));
 
-    // userId ahora está tipado como number
-    const salas = await buscarSalas(filtros, userId as number);
+    res.status(200).json({ success: true, data: salas });
+});
 
-    res.status(200).json({
-        success: true,
-        data: salas
-    });
-};
-
-// NUEVO: Crear Sala
-export const postSalaController = async (req: Request, res: Response) => {
+export const postSalaController = asyncHandler(async (req, res) => {
     const data = req.body as CrearSalaBody;
-    const userId = req.user?.id;
+    const nuevaSala = await crearSalaService(data, obtenerUserId(req));
 
-    if (!userId) {
-        return res.status(401).json({ message: "No autorizado" });
-    }
+    res.status(201).json({ success: true, data: nuevaSala });
+});
 
-    const nuevaSala = await crearSalaService(data, userId);
+export const cambiarEstadoSalaController = asyncHandler(async (req, res) => {
+    const { motivoCancelacion } = req.body as EliminarSalaBody;
+    const resultado = await cambiarEstadoSalaService(obtenerIdParam(req), obtenerUserId(req), motivoCancelacion);
 
-    res.status(201).json({
-        success: true,
-        data: nuevaSala
-    });
-};
+    res.status(200).json({ success: true, data: resultado });
+});
 
-export const cambiarEstadoSalaController = async (req: Request, res: Response) => {
-    try {
-        const id = req.params.id;
-        
-        if (typeof id !== "string") {
-            return res.status(400).json({
-                success: false,
-                message: "El id de la sala no es válido",
-            });
-        }
+export const unirseSalaController = asyncHandler(async (req, res) => {
+    const resultado = await unirseSalaService(obtenerIdParam(req), obtenerUserId(req));
 
-        const userId = req.user?.id;
-        const { motivoCancelacion } = req.body as EliminarSalaBody;
+    res.status(200).json({ success: true, data: resultado });
+});
 
-        if (!userId) {
-            return res.status(401).json({ message: 'No autorizado' });
-        }
+export const leaveSalaController = asyncHandler(async (req, res) => {
+    const resultado = await leaveSalaService(obtenerIdParam(req), obtenerUserId(req));
 
-        const resultado = await cambiarEstadoSalaService(id, userId, motivoCancelacion);
-        res.status(200).json({
-            success: true,
-            data: resultado
-        });
-    } catch (error: any) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
-}
+    res.status(200).json({ success: true, data: resultado });
+});

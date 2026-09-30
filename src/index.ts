@@ -5,7 +5,6 @@ import reviewRoutes from "./modules/review/review.routes";
 import userRoutes from "./modules/user/user.routes";
 import friendshipRoutes from "./modules/friendship/friendship.routes";
 import salaRoutes from "./modules/sala/sala.routes";
-import matchRoutes from "./modules/matches/matches.routes";
 import { AppDataSource } from "./database/data-source";
 
 dotenv.config();
@@ -20,7 +19,6 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/friendships", friendshipRoutes);
 app.use("/api/salas", salaRoutes);
-app.use("/api/matches", matchRoutes);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error("Error capturado:", err.message);

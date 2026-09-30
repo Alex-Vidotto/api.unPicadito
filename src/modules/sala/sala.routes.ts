@@ -1,16 +1,17 @@
 import { Router } from "express";
-import { getSalasController, postSalaController, cambiarEstadoSalaController } from "./sala.controller";
+import { getSalasController, postSalaController, cambiarEstadoSalaController, unirseSalaController, leaveSalaController } from "./sala.controller";
 import { authenticateJWT } from "../../middlewares/auth.middleware";
-import { validateMiddleware, catchAsync } from "../../middlewares/validate.middleware"; 
-import { buscarSalasQuerySchema, crearSalaBodySchema, cambiarEstadoSalaBodySchema } from "./sala.schema";
+import { validateMiddleware } from "../../middlewares/validate.middleware"; 
+import { buscarSalasQuerySchema, crearSalaBodySchema, cambiarEstadoSalaBodySchema, leaveSalaSchema } from "./sala.schema";
 
 const router = Router();
 
 // Endpoint: GET /api/salas/buscar
 router.get(
     "/buscar",
+    authenticateJWT,
     validateMiddleware(buscarSalasQuerySchema, 'query'), 
-    catchAsync(getSalasController) 
+    getSalasController 
 );
 
 // Endpoint: POST /api/salas
@@ -18,7 +19,21 @@ router.post(
     "/",
     authenticateJWT,
     validateMiddleware(crearSalaBodySchema, 'body'),
-    catchAsync(postSalaController)
+    postSalaController
+);
+
+router.post(
+    "/:id/unirse",
+    authenticateJWT,
+    validateMiddleware(leaveSalaSchema, 'params'),
+    unirseSalaController
+);
+
+router.delete(
+    "/:id/salir",
+    authenticateJWT,
+    validateMiddleware(leaveSalaSchema, 'params'),
+    leaveSalaController
 );
 
 router.patch(
