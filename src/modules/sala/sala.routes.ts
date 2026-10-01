@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { getSalasController, postSalaController, cambiarEstadoSalaController, unirseSalaController, leaveSalaController } from "./sala.controller";
+import { getSalasController, postSalaController, cambiarEstadoSalaController, unirseSalaController, leaveSalaController, expulsarJugadorController} from "./sala.controller";
 import { authenticateJWT } from "../../middlewares/auth.middleware";
 import { validateMiddleware } from "../../middlewares/validate.middleware"; 
-import { buscarSalasQuerySchema, crearSalaBodySchema, cambiarEstadoSalaBodySchema, leaveSalaSchema } from "./sala.schema";
+import { buscarSalasQuerySchema, crearSalaBodySchema, cambiarEstadoSalaBodySchema, leaveSalaSchema, expulsarJugadorSchema } from "./sala.schema";
 
 const router = Router();
 
@@ -41,6 +41,14 @@ router.patch(
     authenticateJWT,
     validateMiddleware(cambiarEstadoSalaBodySchema, 'body'),
     cambiarEstadoSalaController
+);
+
+
+router.delete(
+    "/:id/expulsar/:userId",
+    authenticateJWT, 
+    validateMiddleware(expulsarJugadorSchema, 'params'), 
+    expulsarJugadorController
 );
 
 export default router;
