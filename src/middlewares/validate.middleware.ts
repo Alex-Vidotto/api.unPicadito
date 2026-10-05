@@ -11,11 +11,9 @@ export const validateMiddleware = (
         next: NextFunction,
     ): Promise<void> => {
         try {
-            // Validamos con Zod y sobreescribimos los datos
             const parsed = await schema.parseAsync(req[target]);
-            // req.query es readonly en Express v5, usamos Object.assign para mutarlo
             if (target === "query") {
-                Object.assign(req.query, parsed);
+                Object.defineProperty(req, "query", { value: parsed, writable: true });
             } else {
                 req[target] = parsed;
             }
@@ -38,11 +36,5 @@ export const validateMiddleware = (
             }
             res.status(500).json({ message: "Error interno de validación" });
         }
-    };
-};
-
-export const catchAsync = (fn: Function) => {
-    return (req: Request, res: Response, next: NextFunction) => {
-        Promise.resolve(fn(req, res, next)).catch(next);
     };
 };

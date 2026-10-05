@@ -9,16 +9,24 @@ import {
     eliminarParticipacionDeSala,
     contarParticipantesConfirmados,
 } from "./sala.repository";
-import { BuscarSalasQuery, CrearSalaBody } from "./sala.schema";
-import { ConflictError, ForbiddenError, NotFoundError } from "../../common/http-errors";
+import { BuscarSalasQuery, CrearSalaBody, EditarSalaBody } from "./sala.schema";
+import { Sala } from "./sala.entity";
+import { AppDataSource } from "../../database/data-source";
+import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
 
 const ESTADOS_CERRADOS = ["CANCELADA", "FINALIZADA"];
 
-// TODO: Cuando el módulo de amigos esté listo, obtener acá los ids de amigos del usuario
-// y pasarlos a buscarSalasConFiltros (userId se usará entonces).
+const errorHttp = (status: number, mensaje: string) => Object.assign(new Error(mensaje), { status });
+
 export const buscarSalas = (filtros: BuscarSalasQuery, userId: number) => {
     const amigosIds: number[] = [];
     return buscarSalasConFiltros(filtros, amigosIds);
+};
+
+export const obtenerDetalleSalaService = async (salaId: string) => {
+    const sala = await obtenerSalaConParticipantes(salaId);
+    if (!sala) throw errorHttp(404, "Sala no encontrada");
+    return sala;
 };
 
 export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
@@ -33,114 +41,204 @@ export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
     return sala;
 };
 
+export const editarSalaService = async (salaId: string, userId: number, datos: EditarSalaBody) => {
+    return AppDataSource.transaction(async (manager) => {
+        const sala = await manager.createQueryBuilder(Sala, "sala")
+            .leftJoinAndSelect("sala.creador", "creador")
+            .setLock("pessimistic_write")
+            .where("sala.id = :salaId", { salaId })
+            .getOne();
+
+        if (!sala) throw errorHttp(404, "Sala no encontrada");
+        if (sala.creador.id !== userId) throw errorHttp(403, "Solo el creador de la sala puede editarla");
+        if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
+
+        const ahora = Date.now();
+        const fechaPartidoNueva = datos.fechaHoraPartido ?? sala.fechaHoraPartido;
+        const horasHastaElPartidoActual = (sala.fechaHoraPartido.getTime() - ahora) / (1000 * 60 * 60);
+        const horasHastaElPartidoNuevo = (fechaPartidoNueva.getTime() - ahora) / (1000 * 60 * 60);
+        const modificaFechaOUbicacion =
+            datos.fechaHoraPartido !== undefined ||
+            datos.direccion !== undefined ||
+            datos.nombreCancha !== undefined ||
+            datos.ubicacion !== undefined;
+
+        if (datos.fechaHoraPartido && horasHastaElPartidoNuevo <= 0) {
+            throw errorHttp(400, "La nueva fecha del partido debe ser futura");
+        }
+
+        if (
+            modificaFechaOUbicacion &&
+            (horasHastaElPartidoActual <= 24 || horasHastaElPartidoNuevo <= 24)
+        ) {
+            throw errorHttp(400, "No se pueden modificar fecha u ubicación a menos de 24 horas del partido");
+        }
+
+        const datosActualizados: Partial<Sala> = { ...datos };
+
+        if (datos.ubicacion) {
+            datosActualizados.ubicacion = `POINT(${datos.ubicacion.x} ${datos.ubicacion.y})` as any;
+        }
+
+        if (datos.cuposTotales !== undefined) {
+            const participantesConfirmados = await manager.count(ParticipacionSala, {
+                where: { sala: { id: salaId }, estado: "CONFIRMADO" }
+            });
+
+            if (datos.cuposTotales < participantesConfirmados) {
+                throw errorHttp(409, "Los cupos totales no pueden ser menores que los participantes confirmados");
+            }
+
+            datosActualizados.estado = participantesConfirmados >= datos.cuposTotales ? "COMPLETA" : "ABIERTA";
+        }
+
+        await manager.update(Sala, salaId, datosActualizados);
+
+        const salaActualizada = await manager.findOne(Sala, { where: { id: salaId } });
+        if (!salaActualizada) throw errorHttp(404, "Sala no encontrada");
+
+        return salaActualizada;
+    });
+};
+
 export const cambiarEstadoSalaService = async (salaId: string, userId: number, motivo: string) => {
     const sala = await obtenerSalaConCreador(salaId);
 
-    if (!sala) throw new NotFoundError("Sala no encontrada");
-    if (sala.creador.id !== userId) throw new ForbiddenError("Solo el creador de la sala puede dar de baja");
-    if (ESTADOS_CERRADOS.includes(sala.estado)) throw new ConflictError(`La sala se encuentra ${sala.estado}`);
+    if (!sala) throw errorHttp(404, "Sala no encontrada");
+    if (sala.creador.id !== userId) throw errorHttp(403, "Solo el creador de la sala puede dar de baja");
+    if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
 
     await cambiarEstadoSalaEnBD(salaId, motivo);
     return { mensaje: "Sala cancelada correctamente" };
 };
 
 export const leaveSalaService = async (salaId: string, userId: number) => {
-    const sala = await obtenerSalaConParticipantes(salaId);
+    return AppDataSource.transaction(async (manager) => {
+        const sala = await manager.createQueryBuilder(Sala, "sala")
+            .leftJoinAndSelect("sala.creador", "creador")
+            .leftJoinAndSelect("sala.participantes", "participacion")
+            .leftJoinAndSelect("participacion.usuario", "usuario")
+            .setLock("pessimistic_write")
+            .where("sala.id = :salaId", { salaId })
+            .getOne();
 
-    if (!sala) throw new NotFoundError("Sala no encontrada");
-    if (ESTADOS_CERRADOS.includes(sala.estado)) throw new ConflictError(`La sala se encuentra ${sala.estado}`);
-    if (sala.creador?.id === userId) {
-        throw new ConflictError("El creador de la sala no puede salir de ella. Debe cancelarla.");
-    }
-
-    const participacion = sala.participantes?.find((p) => p.usuario?.id === userId);
-    if (!participacion) throw new NotFoundError("No estás participando en esta sala");
-
-    await eliminarParticipacionDeSala(participacion.id);
-
-    // Si la sala estaba completa y se liberó un cupo, se reabre
-    if (sala.estado === "COMPLETA") {
-        const confirmados = await contarParticipantesConfirmados(salaId);
-        if (confirmados < sala.cuposTotales) {
-            await actualizarEstadoSalaEnBD(salaId, "ABIERTA");
+        if (!sala) throw errorHttp(404, "Sala no encontrada");
+        if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
+        if (sala.creador?.id === userId) {
+            throw errorHttp(409, "El creador de la sala no puede salir de ella. Debe cancelarla.");
         }
-    }
 
-    return { salaId, userId, message: "Has salido de la sala correctamente" };
+        const participacion = sala.participantes?.find((p) => p.usuario?.id === userId);
+        if (!participacion) throw errorHttp(404, "No estás participando en esta sala");
+
+        await manager.delete(ParticipacionSala, participacion.id);
+
+        if (sala.estado === "COMPLETA") {
+            const confirmados = await manager.count(ParticipacionSala, {
+                where: { sala: { id: salaId }, estado: "CONFIRMADO" }
+            });
+            if (confirmados < sala.cuposTotales) {
+                await manager.update(Sala, salaId, { estado: "ABIERTA" });
+            }
+        }
+
+        return { salaId, userId, message: "Has salido de la sala correctamente" };
+    });
 };
 
 export const unirseSalaService = async (salaId: string, userId: number) => {
-    const sala = await obtenerSalaConParticipantes(salaId);
+    return AppDataSource.transaction(async (manager) => {
+        const sala = await manager.createQueryBuilder(Sala, "sala")
+            .leftJoinAndSelect("sala.participantes", "participacion")
+            .leftJoinAndSelect("participacion.usuario", "usuario")
+            .setLock("pessimistic_write")
+            .where("sala.id = :salaId", { salaId })
+            .getOne();
 
-    if (!sala) throw new NotFoundError("Sala no encontrada");
-    // COMPLETA sigue aceptando gente si permite suplentes
-    if (!["ABIERTA", "COMPLETA"].includes(sala.estado)) throw new ConflictError(`La sala se encuentra ${sala.estado}`);
-    if (sala.participantes?.some((p) => p.usuario?.id === userId)) throw new ConflictError("Ya formas parte de esta sala");
+        if (!sala) throw errorHttp(404, "Sala no encontrada");
+        if (!["ABIERTA", "COMPLETA"].includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
+        if (sala.participantes?.some((p) => p.usuario?.id === userId)) throw errorHttp(409, "Ya formas parte de esta sala");
 
-    const confirmados = sala.participantes?.filter((p) => p.estado === "CONFIRMADO").length ?? 0;
-    const hayCupo = confirmados < sala.cuposTotales;
+        const confirmados = sala.participantes?.filter((p) => p.estado === "CONFIRMADO").length ?? 0;
+        const hayCupo = confirmados < sala.cuposTotales;
 
-    if (!hayCupo && !sala.permiteSuplentes) throw new ConflictError("La sala está completa");
+        if (!hayCupo && !sala.permiteSuplentes) throw errorHttp(409, "La sala está completa");
 
-    if (!sala.esPublica) {
-        const participacion = await crearParticipacionEnSala(salaId, userId, {
-            estado: "PENDIENTE",
-            rol: "SOLICITANTE",
+        if (!sala.esPublica) {
+            const nuevaParticipacion = manager.create(ParticipacionSala, {
+                sala: { id: salaId },
+                usuario: { id: userId },
+                estado: "PENDIENTE",
+                rol: "SOLICITANTE",
+                origenIngreso: "SOLICITUD_DIRECTA",
+            });
+            const participacion = await manager.save(nuevaParticipacion);
+
+            return {
+                mensaje: "Tu solicitud fue enviada y está pendiente de aprobación",
+                requiereAprobacion: true,
+                participacion,
+            };
+        }
+
+        const rol = hayCupo ? "TITULAR" : "SUPLENTE";
+
+        const nuevaParticipacion = manager.create(ParticipacionSala, {
+            sala: { id: salaId },
+            usuario: { id: userId },
+            estado: "CONFIRMADO",
+            rol,
             origenIngreso: "SOLICITUD_DIRECTA",
         });
+        const participacion = await manager.save(nuevaParticipacion);
 
-        return {
-            mensaje: "Tu solicitud fue enviada y está pendiente de aprobación",
-            requiereAprobacion: true,
-            participacion,
-        };
-    }
+        if (rol === "TITULAR" && confirmados + 1 >= sala.cuposTotales) {
+            await manager.update(Sala, salaId, { estado: "COMPLETA" });
+        }
 
-    const rol = hayCupo ? "TITULAR" : "SUPLENTE";
-
-    const participacion = await crearParticipacionEnSala(salaId, userId, {
-        estado: "CONFIRMADO",
-        rol,
-        origenIngreso: "SOLICITUD_DIRECTA",
+        return { mensaje: "Te uniste a la sala correctamente", rol, participacion };
     });
-
-    // Solo un titular puede completar la sala (un suplente entra con la sala ya completa)
-    if (rol === "TITULAR" && confirmados + 1 >= sala.cuposTotales) {
-        await actualizarEstadoSalaEnBD(salaId, "COMPLETA");
-    }
-
-    return { mensaje: "Te uniste a la sala correctamente", rol, participacion };
 };
 
 export const expulsarJugadorService = async (salaId: string, userIdAExpulsar: number, organizadorId: number) => {
-    const sala = await obtenerSalaConParticipantes(salaId);
+    return AppDataSource.transaction(async (manager) => {
+        const sala = await manager.createQueryBuilder(Sala, "sala")
+            .leftJoinAndSelect("sala.creador", "creador")
+            .leftJoinAndSelect("sala.participantes", "participacion")
+            .leftJoinAndSelect("participacion.usuario", "usuario")
+            .setLock("pessimistic_write")
+            .where("sala.id = :salaId", { salaId })
+            .getOne();
 
-    if (!sala) throw new NotFoundError("Sala no encontrada");
-    if (ESTADOS_CERRADOS.includes(sala.estado)) throw new ConflictError(`La sala se encuentra ${sala.estado}`);
+        if (!sala) throw errorHttp(404, "Sala no encontrada");
+        if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
 
-    if (sala.creador?.id !== organizadorId) {
-        throw new ForbiddenError("Solo el organizador de la sala puede expulsar jugadores");
-    }
-
-    if (userIdAExpulsar === organizadorId) {
-        throw new ConflictError("No puedes expulsarte a ti mismo de esta forma. Debes cancelar la sala.");
-    }
-
-    const participacion = sala.participantes?.find((p) => p.usuario?.id === userIdAExpulsar);
-    if (!participacion) throw new NotFoundError("El jugador no está participando en esta sala");
-
-    await eliminarParticipacionDeSala(participacion.id);
-
-    if (sala.estado === "COMPLETA") {
-        const confirmados = await contarParticipantesConfirmados(salaId);
-        if (confirmados < sala.cuposTotales) {
-            await actualizarEstadoSalaEnBD(salaId, "ABIERTA");
+        if (sala.creador?.id !== organizadorId) {
+            throw errorHttp(403, "Solo el organizador de la sala puede expulsar jugadores");
         }
-    }
 
-    return { 
-        salaId, 
-        userIdExpulsado: userIdAExpulsar, 
-        mensaje: "Jugador expulsado correctamente" 
-    };
+        if (userIdAExpulsar === organizadorId) {
+            throw errorHttp(409, "No puedes expulsarte a ti mismo de esta forma. Debes cancelar la sala.");
+        }
+
+        const participacion = sala.participantes?.find((p) => p.usuario?.id === userIdAExpulsar);
+        if (!participacion) throw errorHttp(404, "El jugador no está participando en esta sala");
+
+        await manager.delete(ParticipacionSala, participacion.id);
+
+        if (sala.estado === "COMPLETA") {
+            const confirmados = await manager.count(ParticipacionSala, {
+                where: { sala: { id: salaId }, estado: "CONFIRMADO" }
+            });
+            if (confirmados < sala.cuposTotales) {
+                await manager.update(Sala, salaId, { estado: "ABIERTA" });
+            }
+        }
+
+        return { 
+            salaId, 
+            userIdExpulsado: userIdAExpulsar, 
+            mensaje: "Jugador expulsado correctamente" 
+        };
+    });
 };

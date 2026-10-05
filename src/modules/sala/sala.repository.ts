@@ -9,7 +9,10 @@ export const baseParticipacionSalaRepo = AppDataSource.getRepository(Participaci
 // Escapa los comodines de LIKE (% y _) para que el usuario no pueda usarlos como wildcard
 const escaparLike = (valor: string) => valor.replace(/[\\%_]/g, "\\$&");
 
-export const buscarSalasConFiltros = (filtros: BuscarSalasQuery, amigosIds: number[] = []) => {
+export const buscarSalasConFiltros = (
+    filtros: BuscarSalasQuery,
+    amigosIds: number[] = []
+) => {
     const {
         lat, lng, radioKm, fechaInicio, fechaFin, esPublica,
         permiteSuplentes, estadoDisponibilidad, nombre, nombreCancha,
@@ -98,3 +101,11 @@ export const actualizarEstadoSalaEnBD = (
     salaId: string,
     estado: "ABIERTA" | "COMPLETA" | "FINALIZADA" | "CANCELADA"
 ) => baseSalaRepo.update(salaId, { estado });
+
+export const actualizarSalaEnBD = async (salaId: string, datos: Partial<Sala>) => {
+    const resultado = await baseSalaRepo.update(salaId, datos);
+
+    if (!resultado.affected) return null;
+
+    return baseSalaRepo.findOne({ where: { id: salaId } });
+};
