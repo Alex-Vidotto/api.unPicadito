@@ -111,3 +111,36 @@ export const unirseSalaService = async (salaId: string, userId: number) => {
 
     return { mensaje: "Te uniste a la sala correctamente", rol, participacion };
 };
+
+export const expulsarJugadorService = async (salaId: string, userIdAExpulsar: number, organizadorId: number) => {
+    const sala = await obtenerSalaConParticipantes(salaId);
+
+    if (!sala) throw new NotFoundError("Sala no encontrada");
+    if (ESTADOS_CERRADOS.includes(sala.estado)) throw new ConflictError(`La sala se encuentra ${sala.estado}`);
+
+    if (sala.creador?.id !== organizadorId) {
+        throw new ForbiddenError("Solo el organizador de la sala puede expulsar jugadores");
+    }
+
+    if (userIdAExpulsar === organizadorId) {
+        throw new ConflictError("No puedes expulsarte a ti mismo de esta forma. Debes cancelar la sala.");
+    }
+
+    const participacion = sala.participantes?.find((p) => p.usuario?.id === userIdAExpulsar);
+    if (!participacion) throw new NotFoundError("El jugador no está participando en esta sala");
+
+    await eliminarParticipacionDeSala(participacion.id);
+
+    if (sala.estado === "COMPLETA") {
+        const confirmados = await contarParticipantesConfirmados(salaId);
+        if (confirmados < sala.cuposTotales) {
+            await actualizarEstadoSalaEnBD(salaId, "ABIERTA");
+        }
+    }
+
+    return { 
+        salaId, 
+        userIdExpulsado: userIdAExpulsar, 
+        mensaje: "Jugador expulsado correctamente" 
+    };
+};

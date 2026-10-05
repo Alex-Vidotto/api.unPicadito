@@ -63,8 +63,15 @@ export const leaveSalaSchema = z.object({
     id: z.string().uuid({ message: "El ID de la sala no tiene un formato UUID válido." }),
 });
 
+
+export const expulsarJugadorSchema = z.object({
+    id: z.string().uuid("ID de sala inválido"),
+    userId: z.string().regex(/^\d+$/, "El ID del usuario debe ser un número válido") 
+});
+
 export type booleanQuery = z.infer<typeof booleanQuery>;
 export type BuscarSalasQuery = z.infer<typeof buscarSalasQuerySchema>;
 export type CrearSalaBody = z.infer<typeof crearSalaBodySchema>;
 export type EliminarSalaBody = z.infer<typeof cambiarEstadoSalaBodySchema>;
 export type LeaveSalaParams = z.infer<typeof leaveSalaSchema>;
+export type ExpulsarJugador =  z.infer<typeof expulsarJugadorSchema>;
