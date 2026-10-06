@@ -1,143 +1,136 @@
 import { Request, Response } from "express";
-import { BuscarSalasQuery, CrearSalaBody, EliminarSalaBody, EditarSalaBody } from "./sala.schema";
-import { buscarSalas, crearSalaService, cambiarEstadoSalaService, unirseSalaService, leaveSalaService, expulsarJugadorService, editarSalaService, obtenerDetalleSalaService } from "./sala.service";
+import {
+    BuscarSalasQuery,
+    CrearSalaBody,
+    EliminarSalaBody,
+    EditarSalaBody,
+    TransferirOrganizadorBody,
+} from "./sala.schema";
+import {
+    buscarSalas,
+    crearSalaService,
+    cambiarEstadoSalaService,
+    unirseSalaService,
+    leaveSalaService,
+    expulsarJugadorService,
+    editarSalaService,
+    obtenerDetalleSalaService,
+    transferirOrganizadorService,
+} from "./sala.service";
 
-// Nota: req.user!.id es seguro porque todas las rutas de sala pasan antes por authenticateJWT.
-// Los datos de req.body / req.params / req.query ya llegan validados por validateMiddleware en sala.routes.ts.
-// En el catch: si el error trae "status" es un error de negocio conocido (404, 403, 409);
-// si no lo trae es inesperado y respondemos 500 sin exponer el detalle interno.
+const responderError = (res: Response, error: unknown): void => {
+    if (
+        typeof error === "object" &&
+        error !== null &&
+        "status" in error &&
+        typeof error.status === "number" &&
+        "message" in error &&
+        typeof error.message === "string"
+    ) {
+        res.status(error.status).json({ success: false, message: error.message });
+        return;
+    }
 
-// GET /api/salas/buscar
+    console.error(error);
+    res.status(500).json({ success: false, message: "Error interno del servidor" });
+};
+
 export const buscar = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = req.user!.id;
         const filtros = req.query as unknown as BuscarSalasQuery;
-
-        const salas = await buscarSalas(filtros, userId);
+        const salas = await buscarSalas(filtros, req.user!.id);
         res.status(200).json({ success: true, data: salas });
-    } catch (error: any) {
-        if (!error.status) console.error(error);
-        res.status(error.status || 500).json({
-            success: false,
-            message: error.status ? error.message : "Error interno del servidor",
-        });
+    } catch (error) {
+        responderError(res, error);
     }
 };
 
 export const obtenerPorId = async (req: Request, res: Response): Promise<void> => {
     try {
-        const salaId = req.params.id as string;
-        const sala = await obtenerDetalleSalaService(salaId);
+        const sala = await obtenerDetalleSalaService(req.params.id as string);
         res.status(200).json({ success: true, data: sala });
-    } catch (error: any) {
-        if (!error.status) console.error(error);
-        res.status(error.status || 500).json({
-            success: false,
-            message: error.status ? error.message : "Error interno del servidor",
-        });
+    } catch (error) {
+        responderError(res, error);
     }
 };
 
-// POST /api/salas
 export const crear = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = req.user!.id;
-        const datos = req.body as CrearSalaBody;
-
-        const nuevaSala = await crearSalaService(datos, userId);
-        res.status(201).json({ success: true, data: nuevaSala });
-    } catch (error: any) {
-        if (!error.status) console.error(error);
-        res.status(error.status || 500).json({
-            success: false,
-            message: error.status ? error.message : "Error interno del servidor",
-        });
+        const sala = await crearSalaService(req.body as CrearSalaBody, req.user!.id);
+        res.status(201).json({ success: true, data: sala });
+    } catch (error) {
+        responderError(res, error);
     }
 };
 
-// POST /api/salas/:id/unirse
 export const unirse = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = req.user!.id;
-        const salaId = req.params.id as string;
-
-        const resultado = await unirseSalaService(salaId, userId);
+        const resultado = await unirseSalaService(req.params.id as string, req.user!.id);
         res.status(200).json({ success: true, data: resultado });
-    } catch (error: any) {
-        if (!error.status) console.error(error);
-        res.status(error.status || 500).json({
-            success: false,
-            message: error.status ? error.message : "Error interno del servidor",
-        });
+    } catch (error) {
+        responderError(res, error);
     }
 };
 
-// DELETE /api/salas/:id/salir
 export const salir = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = req.user!.id;
-        const salaId = req.params.id as string;
-
-        const resultado = await leaveSalaService(salaId, userId);
+        const resultado = await leaveSalaService(req.params.id as string, req.user!.id);
         res.status(200).json({ success: true, data: resultado });
-    } catch (error: any) {
-        if (!error.status) console.error(error);
-        res.status(error.status || 500).json({
-            success: false,
-            message: error.status ? error.message : "Error interno del servidor",
-        });
+    } catch (error) {
+        responderError(res, error);
     }
 };
 
-// PATCH /api/salas/:id/cancelar
 export const cancelar = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = req.user!.id;
-        const salaId = req.params.id as string;
         const { motivoCancelacion } = req.body as EliminarSalaBody;
-
-        const resultado = await cambiarEstadoSalaService(salaId, userId, motivoCancelacion);
+        const resultado = await cambiarEstadoSalaService(
+            req.params.id as string,
+            req.user!.id,
+            motivoCancelacion,
+        );
         res.status(200).json({ success: true, data: resultado });
-    } catch (error: any) {
-        if (!error.status) console.error(error);
-        res.status(error.status || 500).json({
-            success: false,
-            message: error.status ? error.message : "Error interno del servidor",
-        });
+    } catch (error) {
+        responderError(res, error);
     }
 };
 
-// DELETE /api/salas/:id/expulsar/:userId
 export const expulsarJugador = async (req: Request, res: Response): Promise<void> => {
     try {
-        const organizadorId = req.user!.id;
-        const salaId = req.params.id as string;
-        const userIdAExpulsar = Number(req.params.userId);
-
-        const resultado = await expulsarJugadorService(salaId, userIdAExpulsar, organizadorId);
+        const resultado = await expulsarJugadorService(
+            req.params.id as string,
+            Number(req.params.userId),
+            req.user!.id,
+        );
         res.status(200).json({ success: true, data: resultado });
-    } catch (error: any) {
-        if (!error.status) console.error(error);
-        res.status(error.status || 500).json({
-            success: false,
-            message: error.status ? error.message : "Error interno del servidor",
-        });
+    } catch (error) {
+        responderError(res, error);
     }
 };
 
-// PATCH /api/salas/:id
 export const editar = async (req: Request, res: Response): Promise<void> => {
     try {
-        const userId = req.user!.id;
-        const salaId = req.params.id as string;
-        const datos = req.body as EditarSalaBody;
-        const salaActualizada = await editarSalaService(salaId, userId, datos);
+        const salaActualizada = await editarSalaService(
+            req.params.id as string,
+            req.user!.id,
+            req.body as EditarSalaBody,
+        );
         res.status(200).json({ success: true, data: salaActualizada });
-    } catch (error: any) {
-        if (!error.status) console.error(error);
-        res.status(error.status || 500).json({
-            success: false,
-            message: error.status ? error.message : "Error interno del servidor",
-        });
+    } catch (error) {
+        responderError(res, error);
     }
-}
+};
+
+export const transferirOrganizador = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { nuevoOrganizadorUserId } = req.body as TransferirOrganizadorBody;
+        const resultado = await transferirOrganizadorService(
+            req.params.id as string,
+            req.user!.id,
+            nuevoOrganizadorUserId,
+        );
+        res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
