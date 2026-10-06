@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { getSalasController, postSalaController, cambiarEstadoSalaController, unirseSalaController, leaveSalaController, expulsarJugadorController} from "./sala.controller";
+import { getSalasController, postSalaController, cambiarEstadoSalaController, unirseSalaController, leaveSalaController, expulsarJugadorController, transferirOrganizadorController } from "./sala.controller";
 import { authenticateJWT } from "../../middlewares/auth.middleware";
-import { validateMiddleware } from "../../middlewares/validate.middleware"; 
-import { buscarSalasQuerySchema, crearSalaBodySchema, cambiarEstadoSalaBodySchema, leaveSalaSchema, expulsarJugadorSchema } from "./sala.schema";
+import { validateMiddleware } from "../../middlewares/validate.middleware";
+import {
+    buscarSalasQuerySchema, crearSalaBodySchema, cambiarEstadoSalaBodySchema, leaveSalaSchema, expulsarJugadorSchema, transferirOrganizadorBodySchema } from "./sala.schema";
 
 const router = Router();
 
@@ -10,8 +11,8 @@ const router = Router();
 router.get(
     "/buscar",
     authenticateJWT,
-    validateMiddleware(buscarSalasQuerySchema, 'query'), 
-    getSalasController 
+    validateMiddleware(buscarSalasQuerySchema, 'query'),
+    getSalasController
 );
 
 // Endpoint: POST /api/salas
@@ -46,9 +47,16 @@ router.patch(
 
 router.delete(
     "/:id/expulsar/:userId",
-    authenticateJWT, 
-    validateMiddleware(expulsarJugadorSchema, 'params'), 
+    authenticateJWT,
+    validateMiddleware(expulsarJugadorSchema, 'params'),
     expulsarJugadorController
+);
+
+router.patch(
+    "/:id/transferir-organizador",
+    authenticateJWT,
+    validateMiddleware(transferirOrganizadorBodySchema, "body"),
+    transferirOrganizadorController
 );
 
 export default router;

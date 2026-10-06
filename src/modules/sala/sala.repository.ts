@@ -2,6 +2,7 @@ import { AppDataSource } from "../../database/data-source";
 import { Sala } from "./sala.entity";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
 import { BuscarSalasQuery, CrearSalaBody } from "./sala.schema";
+import { RolEnSala, EstadoParticipacion } from "../../constants/type";
 
 export const baseSalaRepo = AppDataSource.getRepository(Sala);
 export const baseParticipacionSalaRepo = AppDataSource.getRepository(ParticipacionSala);
@@ -98,3 +99,37 @@ export const actualizarEstadoSalaEnBD = (
     salaId: string,
     estado: "ABIERTA" | "COMPLETA" | "FINALIZADA" | "CANCELADA"
 ) => baseSalaRepo.update(salaId, { estado });
+
+export const esOrganizadorDeSala = async (salaId: string, userId: number): Promise<boolean> => {
+    const count = await baseParticipacionSalaRepo.count({
+        where: {
+            sala: { id: salaId },
+            usuario: { id: userId },
+            rol: "ORGANIZADOR",
+            estado: "CONFIRMADO"
+        },
+    });
+    return count > 0;
+};
+
+export const obtenerOrganizadorDeSala = (salaId: string) =>
+    baseParticipacionSalaRepo.findOne({
+        where: {
+            sala: { id: salaId },
+            rol: "ORGANIZADOR",
+            estado: "CONFIRMADO"
+        },
+        relations: { usuario: true },
+    });
+
+export const obtenerParticipacionConfirmada = (salaId: string, userId: number) =>
+    baseParticipacionSalaRepo.findOne({
+        where: {
+            sala: { id: salaId },
+            usuario: { id: userId },
+            estado: "CONFIRMADO",
+        },
+    });
+
+export const actualizarRolParticipacion = (participacionId: string, rol: RolEnSala) =>
+    baseParticipacionSalaRepo.update(participacionId, { rol });
