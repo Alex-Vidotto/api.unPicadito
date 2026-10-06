@@ -1,58 +1,136 @@
-import { CrearSalaBody, EliminarSalaBody, buscarSalasQuerySchema, TransferirOrganizadorBody } from "./sala.schema";
-import { buscarSalas, crearSalaService, cambiarEstadoSalaService, unirseSalaService, leaveSalaService, expulsarJugadorService, transferirOrganizadorService } from "./sala.service";
-import { asyncHandler } from "../../middlewares/error.middleware";
-import { obtenerIdParam, obtenerUserId } from "../../common/request.helpers";
+import { Request, Response } from "express";
+import {
+    BuscarSalasQuery,
+    CrearSalaBody,
+    EliminarSalaBody,
+    EditarSalaBody,
+    TransferirOrganizadorBody,
+} from "./sala.schema";
+import {
+    buscarSalas,
+    crearSalaService,
+    cambiarEstadoSalaService,
+    unirseSalaService,
+    leaveSalaService,
+    expulsarJugadorService,
+    editarSalaService,
+    obtenerDetalleSalaService,
+    transferirOrganizadorService,
+} from "./sala.service";
 
-export const getSalasController = asyncHandler(async (req, res) => {
-    const filtros = buscarSalasQuerySchema.parse(req.query);
-    const salas = await buscarSalas(filtros, obtenerUserId(req));
+const responderError = (res: Response, error: unknown): void => {
+    if (
+        typeof error === "object" &&
+        error !== null &&
+        "status" in error &&
+        typeof error.status === "number" &&
+        "message" in error &&
+        typeof error.message === "string"
+    ) {
+        res.status(error.status).json({ success: false, message: error.message });
+        return;
+    }
 
-    res.status(200).json({ success: true, data: salas });
-});
+    console.error(error);
+    res.status(500).json({ success: false, message: "Error interno del servidor" });
+};
 
-export const postSalaController = asyncHandler(async (req, res) => {
-    const data = req.body as CrearSalaBody;
-    const nuevaSala = await crearSalaService(data, obtenerUserId(req));
+export const buscar = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const filtros = req.query as unknown as BuscarSalasQuery;
+        const salas = await buscarSalas(filtros, req.user!.id);
+        res.status(200).json({ success: true, data: salas });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
 
-    res.status(201).json({ success: true, data: nuevaSala });
-});
+export const obtenerPorId = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const sala = await obtenerDetalleSalaService(req.params.id as string);
+        res.status(200).json({ success: true, data: sala });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
 
-export const cambiarEstadoSalaController = asyncHandler(async (req, res) => {
-    const { motivoCancelacion } = req.body as EliminarSalaBody;
-    const resultado = await cambiarEstadoSalaService(obtenerIdParam(req), obtenerUserId(req), motivoCancelacion);
+export const crear = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const sala = await crearSalaService(req.body as CrearSalaBody, req.user!.id);
+        res.status(201).json({ success: true, data: sala });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
 
-    res.status(200).json({ success: true, data: resultado });
-});
+export const unirse = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const resultado = await unirseSalaService(req.params.id as string, req.user!.id);
+        res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
 
-export const unirseSalaController = asyncHandler(async (req, res) => {
-    const resultado = await unirseSalaService(obtenerIdParam(req), obtenerUserId(req));
+export const salir = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const resultado = await leaveSalaService(req.params.id as string, req.user!.id);
+        res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
 
-    res.status(200).json({ success: true, data: resultado });
-});
+export const cancelar = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { motivoCancelacion } = req.body as EliminarSalaBody;
+        const resultado = await cambiarEstadoSalaService(
+            req.params.id as string,
+            req.user!.id,
+            motivoCancelacion,
+        );
+        res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
 
-export const leaveSalaController = asyncHandler(async (req, res) => {
-    const resultado = await leaveSalaService(obtenerIdParam(req), obtenerUserId(req));
+export const expulsarJugador = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const resultado = await expulsarJugadorService(
+            req.params.id as string,
+            Number(req.params.userId),
+            req.user!.id,
+        );
+        res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
 
-    res.status(200).json({ success: true, data: resultado });
-});
+export const editar = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const salaActualizada = await editarSalaService(
+            req.params.id as string,
+            req.user!.id,
+            req.body as EditarSalaBody,
+        );
+        res.status(200).json({ success: true, data: salaActualizada });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
 
-
-export const expulsarJugadorController = asyncHandler(async (req, res) => {
-    const salaId = obtenerIdParam(req);
-    const organizadorId = obtenerUserId(req);
-    const userIdAExpulsar = parseInt(req.params.userId as string, 10);
-
-    const resultado = await expulsarJugadorService(salaId, userIdAExpulsar, organizadorId);
-
-    res.status(200).json({ success: true, data: resultado });
-});
-
-export const transferirOrganizadorController = asyncHandler(async (req, res) => {
-    const salaId = obtenerIdParam(req);
-    const userId = obtenerUserId(req);
-    const { nuevoOrganizadorUserId } = req.body as TransferirOrganizadorBody;
-
-    const resultado = await transferirOrganizadorService(salaId, userId, nuevoOrganizadorUserId);
-
-    res.status(200).json({ success: true, data: resultado });
-});
+export const transferirOrganizador = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { nuevoOrganizadorUserId } = req.body as TransferirOrganizadorBody;
+        const resultado = await transferirOrganizadorService(
+            req.params.id as string,
+            req.user!.id,
+            nuevoOrganizadorUserId,
+        );
+        res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};

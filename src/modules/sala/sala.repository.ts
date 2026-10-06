@@ -2,7 +2,7 @@ import { AppDataSource } from "../../database/data-source";
 import { Sala } from "./sala.entity";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
 import { BuscarSalasQuery, CrearSalaBody } from "./sala.schema";
-import { RolEnSala, EstadoParticipacion } from "../../constants/type";
+import { RolEnSala } from "../../constants/type";
 
 export const baseSalaRepo = AppDataSource.getRepository(Sala);
 export const baseParticipacionSalaRepo = AppDataSource.getRepository(ParticipacionSala);
@@ -10,7 +10,10 @@ export const baseParticipacionSalaRepo = AppDataSource.getRepository(Participaci
 // Escapa los comodines de LIKE (% y _) para que el usuario no pueda usarlos como wildcard
 const escaparLike = (valor: string) => valor.replace(/[\\%_]/g, "\\$&");
 
-export const buscarSalasConFiltros = (filtros: BuscarSalasQuery, amigosIds: number[] = []) => {
+export const buscarSalasConFiltros = (
+    filtros: BuscarSalasQuery,
+    amigosIds: number[] = []
+) => {
     const {
         lat, lng, radioKm, fechaInicio, fechaFin, esPublica,
         permiteSuplentes, estadoDisponibilidad, nombre, nombreCancha,
@@ -99,6 +102,14 @@ export const actualizarEstadoSalaEnBD = (
     salaId: string,
     estado: "ABIERTA" | "COMPLETA" | "FINALIZADA" | "CANCELADA"
 ) => baseSalaRepo.update(salaId, { estado });
+
+export const actualizarSalaEnBD = async (salaId: string, datos: Partial<Sala>) => {
+    const resultado = await baseSalaRepo.update(salaId, datos);
+
+    if (!resultado.affected) return null;
+
+    return baseSalaRepo.findOne({ where: { id: salaId } });
+};
 
 export const esOrganizadorDeSala = async (salaId: string, userId: number): Promise<boolean> => {
     const count = await baseParticipacionSalaRepo.count({
