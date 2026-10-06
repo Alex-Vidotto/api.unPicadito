@@ -8,9 +8,13 @@ import {
     actualizarEstadoSalaEnBD,
     eliminarParticipacionDeSala,
     contarParticipantesConfirmados,
+    esOrganizadorDeSala,
+    obtenerOrganizadorDeSala,
+    obtenerParticipacionConfirmada,
+    actualizarRolParticipacion
 } from "./sala.repository";
 import { BuscarSalasQuery, CrearSalaBody } from "./sala.schema";
-import { ConflictError, ForbiddenError, NotFoundError } from "../../common/http-errors";
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../common/http-errors";
 
 const ESTADOS_CERRADOS = ["CANCELADA", "FINALIZADA"];
 
@@ -37,7 +41,7 @@ export const cambiarEstadoSalaService = async (salaId: string, userId: number, m
     const sala = await obtenerSalaConCreador(salaId);
 
     if (!sala) throw new NotFoundError("Sala no encontrada");
-    if (sala.creador.id !== userId) throw new ForbiddenError("Solo el creador de la sala puede dar de baja");
+    if (!await esOrganizadorDeSala(salaId, userId)) throw new ForbiddenError("Solo el organizador de la sala puede cancelarla");
     if (ESTADOS_CERRADOS.includes(sala.estado)) throw new ConflictError(`La sala se encuentra ${sala.estado}`);
 
     await cambiarEstadoSalaEnBD(salaId, motivo);
@@ -49,9 +53,7 @@ export const leaveSalaService = async (salaId: string, userId: number) => {
 
     if (!sala) throw new NotFoundError("Sala no encontrada");
     if (ESTADOS_CERRADOS.includes(sala.estado)) throw new ConflictError(`La sala se encuentra ${sala.estado}`);
-    if (sala.creador?.id === userId) {
-        throw new ConflictError("El creador de la sala no puede salir de ella. Debe cancelarla.");
-    }
+    if (await esOrganizadorDeSala(salaId, userId)) throw new ConflictError("El organizador no puede salir de sala, debe transferir el rol o cancelarla.");
 
     const participacion = sala.participantes?.find((p) => p.usuario?.id === userId);
     if (!participacion) throw new NotFoundError("No estás participando en esta sala");
@@ -118,7 +120,7 @@ export const expulsarJugadorService = async (salaId: string, userIdAExpulsar: nu
     if (!sala) throw new NotFoundError("Sala no encontrada");
     if (ESTADOS_CERRADOS.includes(sala.estado)) throw new ConflictError(`La sala se encuentra ${sala.estado}`);
 
-    if (sala.creador?.id !== organizadorId) {
+    if (!(await esOrganizadorDeSala(salaId, organizadorId))) {
         throw new ForbiddenError("Solo el organizador de la sala puede expulsar jugadores");
     }
 
@@ -138,9 +140,41 @@ export const expulsarJugadorService = async (salaId: string, userIdAExpulsar: nu
         }
     }
 
-    return { 
-        salaId, 
-        userIdExpulsado: userIdAExpulsar, 
-        mensaje: "Jugador expulsado correctamente" 
+    return {
+        salaId,
+        userIdExpulsado: userIdAExpulsar,
+        mensaje: "Jugador expulsado correctamente"
     };
 };
+
+export const transferirOrganizadorService = async (salaId: string, userId: number, nuevoOrganizadorId: number) => {
+
+    // verifica que la sala exista
+    const sala = await obtenerSalaConParticipantes(salaId);
+    if (!sala) throw new NotFoundError("Sala no encontrada");
+
+    // verifica que la sala no este cerrada
+    if (ESTADOS_CERRADOS.includes(sala.estado)) throw new ConflictError(`La sala se encuentra ${sala.estado}`);
+
+    // verifica que el usuario sea el organizador actual
+    if (!(await esOrganizadorDeSala(salaId, userId))) throw new ForbiddenError("Solo el organizador de la sala puede transferir el rol.");
+
+    // verifica que el nuevo organizador sea distinto al actual
+    if (nuevoOrganizadorId === userId) throw new ConflictError("No puedes transferirte la organizacion a ti mismo");
+
+    // verifica que el nuevo organizador este confirmado en la sala
+    const participacionOrganizadorActual = await obtenerOrganizadorDeSala(salaId);
+    if (!participacionOrganizadorActual) {
+        throw new NotFoundError("No se encontro al organizador actual en la sala.")
+    }
+
+    // transferir : organizacion actual a TITULAR
+    await actualizarRolParticipacion(participacionOrganizadorActual.id, "TITULAR");
+    // Nuevo participante pasa a organizador
+    await actualizarRolParticipacion(participacionOrganizadorActual.id, "ORGANIZADOR");
+    return {
+        message: "Organizacion transferida correctamente",
+        anteriorOrganizadorId: userId,
+        nuevoOrganizadorId: nuevoOrganizadorId
+    };
+}
