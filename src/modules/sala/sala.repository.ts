@@ -10,23 +10,19 @@ export const baseParticipacionSalaRepo = AppDataSource.getRepository(Participaci
 // Escapa los comodines de LIKE (% y _) para que el usuario no pueda usarlos como wildcard
 const escaparLike = (valor: string) => valor.replace(/[\\%_]/g, "\\$&");
 
-export const buscarSalasConFiltros = (
+export const buscarSalasConFiltros = async (
     filtros: BuscarSalasQuery,
-    amigosIds: number[] = []
+    amigosIds: number[] = [],
+    userId?: number
 ) => {
     const {
         lat, lng, radioKm, fechaInicio, fechaFin, esPublica,
         permiteSuplentes, estadoDisponibilidad, nombre, nombreCancha,
-        // TODO: Descomentar cuando el módulo de amigos esté listo
-        // soloAmigos
+        limite, pagina,
     } = filtros;
-
-    // TODO: Descomentar cuando el módulo de amigos esté listo
-    // if (soloAmigos && amigosIds.length === 0) return Promise.resolve([]);
 
     const query = baseSalaRepo.createQueryBuilder("sala")
         .leftJoinAndSelect("sala.creador", "creador")
-        // Solo las participaciones CONFIRMADAS ocupan cupo (PENDIENTE/SOLICITANTE no cuentan)
         .leftJoin("sala.participantes", "participacion", "participacion.estado = :confirmado", { confirmado: "CONFIRMADO" })
         .where("sala.estado = :estado", { estado: "ABIERTA" });
 
@@ -37,22 +33,62 @@ export const buscarSalasConFiltros = (
     if (fechaInicio) query.andWhere("sala.fechaHoraPartido >= :fechaInicio", { fechaInicio });
     if (fechaFin) query.andWhere("sala.fechaHoraPartido <= :fechaFin", { fechaFin });
 
-    // TODO: Descomentar cuando el módulo de amigos esté listo
-    // if (soloAmigos && amigosIds.length > 0) query.andWhere("sala.creador_id IN (:...amigosIds)", { amigosIds });
-
-    // Point recibe primero longitud (lng) y luego latitud (lat)
     if (lat !== undefined && lng !== undefined && radioKm !== undefined) {
         query.andWhere("ST_Distance_Sphere(sala.ubicacion, Point(:lng, :lat)) <= :radio", {
             lat, lng, radio: radioKm * 1000,
         });
     }
 
+    if (userId !== undefined) {
+        query.leftJoin("sala.participantes", "mi_part", "mi_part.usuario_id = :userId", { userId });
+        query.addSelect("COUNT(DISTINCT mi_part.id)", "unidoPorUsuarioActual");
+    } else {
+        query.addSelect("0", "unidoPorUsuarioActual");
+    }
+
+    // Conteo SQL directo de cupos ocupados (confirmados)
+    query.addSelect("COUNT(DISTINCT participacion.id)", "cuposOcupados");
+
     query.groupBy("sala.id").addGroupBy("creador.id");
 
-    if (estadoDisponibilidad === "DISPONIBLES") query.having("COUNT(participacion.id) < sala.cuposTotales");
-    else if (estadoDisponibilidad === "LLENAS") query.having("COUNT(participacion.id) >= sala.cuposTotales");
+    if (estadoDisponibilidad === "DISPONIBLES") {
+        query.having("COUNT(DISTINCT participacion.id) < sala.cuposTotales");
+    } else if (estadoDisponibilidad === "LLENAS") {
+        query.having("COUNT(DISTINCT participacion.id) >= sala.cuposTotales");
+    }
 
-    return query.getMany();
+    // Orden estable (desempate por ID) y paginación determinista
+    query.orderBy("sala.fechaHoraPartido", "ASC")
+        .addOrderBy("sala.id", "ASC")
+        .skip((pagina - 1) * limite)
+        .take(limite);
+
+    const { entities, raw } = await query.getRawAndEntities();
+
+    // Mapeo seguro indexado por sala.id (sin depender de posición y validando alias)
+    const metricasPorSalaId = new Map<string, { cuposOcupados: number; unidoPorUsuarioActual: number }>();
+
+    for (const row of raw) {
+        const id = row.sala_id;
+        if (!id || metricasPorSalaId.has(id)) continue;
+
+        if (!("cuposOcupados" in row)) {
+            throw new Error("Alias SQL 'cuposOcupados' no devuelto por getRawAndEntities()");
+        }
+
+        metricasPorSalaId.set(id, {
+            cuposOcupados: Number(row.cuposOcupados),
+            unidoPorUsuarioActual: Number(row.unidoPorUsuarioActual),
+        });
+    }
+
+    return entities.map((sala) => {
+        const metricas = metricasPorSalaId.get(sala.id);
+        if (!metricas) {
+            throw new Error(`Inconsistencia: no se encontraron métricas agregadas para la sala ${sala.id}`);
+        }
+        return Object.assign(sala, metricas);
+    });
 };
 
 export const crearNuevaSala = ({ ubicacion, ...restoData }: CrearSalaBody, userId: number) =>

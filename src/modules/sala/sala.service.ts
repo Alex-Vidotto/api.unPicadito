@@ -15,7 +15,7 @@ const errorHttp = (status: number, mensaje: string) => Object.assign(new Error(m
 
 export const buscarSalas = (filtros: BuscarSalasQuery, userId: number) => {
     const amigosIds: number[] = [];
-    return buscarSalasConFiltros(filtros, amigosIds);
+    return buscarSalasConFiltros(filtros, amigosIds, userId);
 };
 
 export const obtenerDetalleSalaService = async (salaId: string) => {
@@ -45,9 +45,19 @@ export const editarSalaService = async (salaId: string, userId: number, datos: E
             .getOne();
 
         if (!sala) throw errorHttp(404, "Sala no encontrada");
-        if (sala.creador.id !== userId) throw errorHttp(403, "Solo el creador de la sala puede editarla");
-        if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
 
+        const esOrganizador = await manager.count(ParticipacionSala, {
+            where: {
+                sala: { id: salaId },
+                usuario: { id: userId },
+                rol: "ORGANIZADOR",
+                estado: "CONFIRMADO",
+            },
+        });
+        if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede editarla");
+
+        if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
+        
         const ahora = Date.now();
         const fechaPartidoNueva = datos.fechaHoraPartido ?? sala.fechaHoraPartido;
         const horasHastaElPartidoActual = (sala.fechaHoraPartido.getTime() - ahora) / (1000 * 60 * 60);
