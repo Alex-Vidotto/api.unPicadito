@@ -20,6 +20,8 @@ export const buscarSalasQuerySchema = z.object({
     permiteSuplentes: booleanQuery.optional(),
     nombre: z.string().optional(),
     nombreCancha: z.string().optional(),
+    limite: z.coerce.number().int().positive().max(100).default(20),
+    pagina: z.coerce.number().int().positive().default(1),
 });
 
 export const crearSalaBodySchema = z.object({
@@ -27,14 +29,16 @@ export const crearSalaBodySchema = z.object({
     descripcion: z.string().optional(),
     nombreCancha: z.string().min(3).max(50),
     direccion: z.string().min(5).max(100),
-    fechaHoraPartido: z.coerce.date(),
+    fechaHoraPartido: z.coerce.date().refine((fecha) => fecha > new Date(), {
+        message: "La fecha del partido no puede ser en el pasado",
+    }),
     cuposTotales: z.number().int().positive().default(10),
     permiteSuplentes: booleanQuery.optional(),
     cuposSuplentesMax: z.number().int().min(0).default(4),
     esPublica: booleanQuery.optional(),
     ubicacion: z.object({
-        x: z.number(),
-        y: z.number(),
+        x: z.number().finite().min(-180).max(180),
+        y: z.number().finite().min(-90).max(90),
     }),
 });
 
