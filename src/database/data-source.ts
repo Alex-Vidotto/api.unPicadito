@@ -5,6 +5,7 @@ import { Sala } from "../modules/sala/sala.entity.js";
 import { Review } from "../modules/review/review.entity.js";
 import { FriendshipEntity } from "../modules/friendship/friendship.entity.js";
 import { ParticipacionSala } from "../modules/participacionSala/participacionSala.entity.js";
+import { Message } from "../modules/messages/message.entity";
 
 export const AppDataSource = new DataSource({
     type: "mysql",
@@ -12,8 +13,8 @@ export const AppDataSource = new DataSource({
     port: Number(process.env.DB_PORT) || 3306,
     username: process.env.DB_USER || "root",
     password: process.env.DB_PASS || "",
-    database: process.env.DB_NAME || "picadito_db" || "un_picadito_db",
+    database: process.env.DB_NAME || "picadito_db",
     synchronize: true,
-    entities: [User, FriendshipEntity, Sala, ParticipacionSala, Review],
+    entities: [User, FriendshipEntity, Sala, ParticipacionSala, Review, Message],
 });
 
