@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import "dotenv/config";
 import { DataSource } from "typeorm";
 import { User } from "../modules/user/user.entity.js";
 import { Sala } from "../modules/sala/sala.entity.js";
@@ -6,6 +7,7 @@ import { Review } from "../modules/review/review.entity.js";
 import { FriendshipEntity } from "../modules/friendship/friendship.entity.js";
 import { ParticipacionSala } from "../modules/participacionSala/participacionSala.entity.js";
 import { Message } from "../modules/messages/message.entity";
+
 
 export const AppDataSource = new DataSource({
     type: "mysql",

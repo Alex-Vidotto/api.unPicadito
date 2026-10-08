@@ -57,6 +57,9 @@ export class Sala {
     })
     estado: EstadoSala;
 
+    @Column({ type: "text", nullable: true })
+    motivoCancelacion: string | null;
+
     @ManyToOne(() => User, (user) => user.salasCreadas, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'creador_id' })
     creador: User;

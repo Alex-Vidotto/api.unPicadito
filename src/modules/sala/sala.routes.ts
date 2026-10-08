@@ -1,25 +1,83 @@
 import { Router } from "express";
-import { getSalasController, postSalaController } from "./sala.controller";
+import * as salaController from "./sala.controller";
 import { authenticateJWT } from "../../middlewares/auth.middleware";
-import { validateMiddleware, catchAsync } from "../../middlewares/validate.middleware"; 
-import { buscarSalasQuerySchema, crearSalaBodySchema } from "./sala.schema";
+import { validateMiddleware } from "../../middlewares/validate.middleware";
+import {
+    buscarSalasQuerySchema,
+    cambiarEstadoSalaBodySchema,
+    crearSalaBodySchema,
+    editarSalaBodySchema,
+    expulsarJugadorSchema,
+    salaIdParamsSchema,
+    transferirOrganizadorBodySchema,
+} from "./sala.schema";
 
 const router = Router();
 
-// Endpoint: GET /api/salas/buscar
 router.get(
     "/buscar",
-    authenticateJWT, 
-    validateMiddleware(buscarSalasQuerySchema, 'query'), 
-    catchAsync(getSalasController) 
+    authenticateJWT,
+    validateMiddleware(buscarSalasQuerySchema, "query"),
+    salaController.buscar,
 );
 
-// Endpoint: POST /api/salas
+router.get(
+    "/:id",
+    authenticateJWT,
+    validateMiddleware(salaIdParamsSchema, "params"),
+    salaController.obtenerPorId,
+);
+
 router.post(
     "/",
     authenticateJWT,
-    validateMiddleware(crearSalaBodySchema, 'body'),
-    catchAsync(postSalaController)
+    validateMiddleware(crearSalaBodySchema, "body"),
+    salaController.crear,
+);
+
+router.post(
+    "/:id/unirse",
+    authenticateJWT,
+    validateMiddleware(salaIdParamsSchema, "params"),
+    salaController.unirse,
+);
+
+router.delete(
+    "/:id/salir",
+    authenticateJWT,
+    validateMiddleware(salaIdParamsSchema, "params"),
+    salaController.salir,
+);
+
+router.patch(
+    "/:id/cancelar",
+    authenticateJWT,
+    validateMiddleware(salaIdParamsSchema, "params"),
+    validateMiddleware(cambiarEstadoSalaBodySchema, "body"),
+    salaController.cancelar,
+);
+
+router.delete(
+    "/:id/expulsar/:userId",
+    authenticateJWT,
+    validateMiddleware(expulsarJugadorSchema, "params"),
+    salaController.expulsarJugador,
+);
+
+router.patch(
+    "/:id",
+    authenticateJWT,
+    validateMiddleware(salaIdParamsSchema, "params"),
+    validateMiddleware(editarSalaBodySchema, "body"),
+    salaController.editar,
+);
+
+router.patch(
+    "/:id/transferir-organizador",
+    authenticateJWT,
+    validateMiddleware(salaIdParamsSchema, "params"),
+    validateMiddleware(transferirOrganizadorBodySchema, "body"),
+    salaController.transferirOrganizador,
 );
 
 export default router;
