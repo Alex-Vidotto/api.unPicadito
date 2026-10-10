@@ -94,6 +94,11 @@ export const transferirOrganizadorBodySchema = z.object({
         .positive("Debe ser un ID de usuario válido"),
 });
 
+export const aceptarSolicitudParamsSchema = z.object({
+    id: z.string().uuid("El ID de la sala no tiene un formato UUID válido"),
+    participacionId: z.string().uuid("El ID de la participación no tiene un formato UUID válido"),
+});
+
 export type BooleanQuery = z.infer<typeof booleanQuery>;
 export type BuscarSalasQuery = z.infer<typeof buscarSalasQuerySchema>;
 export type CrearSalaBody = z.infer<typeof crearSalaBodySchema>;
@@ -103,3 +108,4 @@ export type LeaveSalaParams = z.infer<typeof leaveSalaSchema>;
 export type ExpulsarJugador = z.infer<typeof expulsarJugadorSchema>;
 export type EditarSalaBody = z.infer<typeof editarSalaBodySchema>;
 export type TransferirOrganizadorBody = z.infer<typeof transferirOrganizadorBodySchema>;
+export type AceptarSolicitudParams = z.infer<typeof aceptarSolicitudParamsSchema>;

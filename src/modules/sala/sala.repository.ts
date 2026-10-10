@@ -2,7 +2,7 @@ import { AppDataSource } from "../../database/data-source";
 import { Sala } from "./sala.entity";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
 import { BuscarSalasQuery, CrearSalaBody } from "./sala.schema";
-import { RolEnSala } from "../../constants/type";
+import { EstadoParticipacion, RolEnSala } from "../../constants/type";
 
 export const baseSalaRepo = AppDataSource.getRepository(Sala);
 export const baseParticipacionSalaRepo = AppDataSource.getRepository(ParticipacionSala);
@@ -180,3 +180,15 @@ export const obtenerParticipacionConfirmada = (salaId: string, userId: number) =
 
 export const actualizarRolParticipacion = (participacionId: string, rol: RolEnSala) =>
     baseParticipacionSalaRepo.update(participacionId, { rol });
+
+export const obtenerParticipacionPorId = (participacionId: string) =>
+    baseParticipacionSalaRepo.findOne({
+        where: { id: participacionId },
+        relations: { usuario: true, sala: true },
+    });
+
+export const actualizarEstadoYRolPArticipacion = (
+    participacionId: string,
+    rol: RolEnSala,
+    estado: EstadoParticipacion) =>
+    baseParticipacionSalaRepo.update(participacionId, { rol, estado });
