@@ -175,6 +175,7 @@ export const unirseSalaService = async (salaId: string, userId: number) => {
 
         if (!sala) throw errorHttp(404, "Sala no encontrada");
         if (!["ABIERTA", "COMPLETA"].includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
+        if (new Date(sala.fechaHoraPartido) <= new Date()) throw errorHttp(400, "No puedes unirte a un partido que ya finalizó o está en curso");
         if (sala.participantes?.some((p) => p.usuario?.id === userId)) throw errorHttp(409, "Ya formas parte de esta sala");
 
         const confirmados = sala.participantes?.filter((p) => p.estado === "CONFIRMADO").length ?? 0;

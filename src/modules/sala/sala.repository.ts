@@ -30,7 +30,10 @@ export const buscarSalasConFiltros = async (
     if (nombreCancha) query.andWhere("sala.nombreCancha LIKE :nombreCancha", { nombreCancha: `%${escaparLike(nombreCancha)}%` });
     if (esPublica !== undefined) query.andWhere("sala.esPublica = :esPublica", { esPublica });
     if (permiteSuplentes !== undefined) query.andWhere("sala.permiteSuplentes = :permiteSuplentes", { permiteSuplentes });
-    if (fechaInicio) query.andWhere("sala.fechaHoraPartido >= :fechaInicio", { fechaInicio });
+    const ahora = new Date();
+    const fechaMinima = fechaInicio && new Date(fechaInicio) > ahora ? fechaInicio : ahora;
+    query.andWhere("sala.fechaHoraPartido >= :fechaMinima", { fechaMinima });
+
     if (fechaFin) query.andWhere("sala.fechaHoraPartido <= :fechaFin", { fechaFin });
 
     if (lat !== undefined && lng !== undefined && radioKm !== undefined) {
