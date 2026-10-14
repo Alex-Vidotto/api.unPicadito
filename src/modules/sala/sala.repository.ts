@@ -7,7 +7,6 @@ import { EstadoParticipacion, RolEnSala } from "../../constants/type";
 export const baseSalaRepo = AppDataSource.getRepository(Sala);
 export const baseParticipacionSalaRepo = AppDataSource.getRepository(ParticipacionSala);
 
-// Escapa los comodines de LIKE (% y _) para que el usuario no pueda usarlos como wildcard
 const escaparLike = (valor: string) => valor.replace(/[\\%_]/g, "\\$&");
 
 export const buscarSalasConFiltros = async (
@@ -49,7 +48,6 @@ export const buscarSalasConFiltros = async (
         query.addSelect("0", "unidoPorUsuarioActual");
     }
 
-    // Conteo SQL directo de cupos ocupados (confirmados)
     query.addSelect("COUNT(DISTINCT participacion.id)", "cuposOcupados");
 
     query.groupBy("sala.id").addGroupBy("creador.id");
@@ -60,7 +58,6 @@ export const buscarSalasConFiltros = async (
         query.having("COUNT(DISTINCT participacion.id) >= sala.cuposTotales");
     }
 
-    // Orden estable (desempate por ID) y paginación determinista
     query.orderBy("sala.fechaHoraPartido", "ASC")
         .addOrderBy("sala.id", "ASC")
         .skip((pagina - 1) * limite)
@@ -68,7 +65,6 @@ export const buscarSalasConFiltros = async (
 
     const { entities, raw } = await query.getRawAndEntities();
 
-    // Mapeo seguro indexado por sala.id (sin depender de posición y validando alias)
     const metricasPorSalaId = new Map<string, { cuposOcupados: number; unidoPorUsuarioActual: number }>();
 
     for (const row of raw) {
@@ -98,7 +94,6 @@ export const crearNuevaSala = ({ ubicacion, ...restoData }: CrearSalaBody, userI
     baseSalaRepo.save(baseSalaRepo.create({
         ...restoData,
         creador: { id: userId },
-        // Formato WKT que entiende MySQL: "POINT(x y)"
         ubicacion: `POINT(${ubicacion.x} ${ubicacion.y})` as any,
     }));
 
