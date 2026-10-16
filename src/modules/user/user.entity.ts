@@ -30,7 +30,7 @@ export class User {
     apodo?: string;
 
     @Column({ type: "varchar", length: 255, nullable: true })
-    fotoPerfilUrl?: string;
+    fotoPerfilUrl?: string | null;
 
     @Column({ type: "varchar", length: 30, default: "POLIFUNCIONAL" })
     posicionPrincipal!: PosicionCancha;
