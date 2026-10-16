@@ -10,7 +10,10 @@ import {
     expulsarJugadorSchema,
     salaIdParamsSchema,
     transferirOrganizadorBodySchema,
+    aceptarSolicitudParamsSchema,
 } from "./sala.schema";
+
+
 
 const router = Router();
 
@@ -78,6 +81,13 @@ router.patch(
     validateMiddleware(salaIdParamsSchema, "params"),
     validateMiddleware(transferirOrganizadorBodySchema, "body"),
     salaController.transferirOrganizador,
+);
+
+router.patch(
+    "/:id/solicitudes/:participacionId/aceptar",
+    authenticateJWT,
+    validateMiddleware(aceptarSolicitudParamsSchema, "params"),
+    salaController.aceptarSolicitudController
 );
 
 export default router;

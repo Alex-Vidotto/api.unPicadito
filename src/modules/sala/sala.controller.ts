@@ -5,6 +5,7 @@ import {
     EliminarSalaBody,
     EditarSalaBody,
     TransferirOrganizadorBody,
+    AceptarSolicitudParams
 } from "./sala.schema";
 import {
     buscarSalas,
@@ -16,6 +17,7 @@ import {
     editarSalaService,
     obtenerDetalleSalaService,
     transferirOrganizadorService,
+    aceptarSolicitudService
 } from "./sala.service";
 
 const responderError = (res: Response, error: unknown): void => {
@@ -129,6 +131,20 @@ export const transferirOrganizador = async (req: Request, res: Response): Promis
             req.user!.id,
             nuevoOrganizadorUserId,
         );
+        res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
+
+export const aceptarSolicitudController = async (req: Request, res: Response) => {
+    try {
+        const salaId = req.params.id as string;
+        const participacionId = req.params.participacionId as string;
+        const organizadorId = req.user!.id;
+
+        const resultado = await aceptarSolicitudService(salaId, participacionId, organizadorId);
+
         res.status(200).json({ success: true, data: resultado });
     } catch (error) {
         responderError(res, error);

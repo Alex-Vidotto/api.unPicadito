@@ -3,6 +3,11 @@ import {
     crearNuevaSala,
     obtenerSalaConParticipantes,
     crearParticipacionEnSala,
+    obtenerParticipacionPorId,
+    actualizarRolParticipacion,
+    actualizarEstadoSalaEnBD,
+    contarParticipantesConfirmados,
+    esOrganizadorDeSala,
 } from "./sala.repository";
 import { BuscarSalasQuery, CrearSalaBody, EditarSalaBody } from "./sala.schema";
 import { Sala } from "./sala.entity";
@@ -57,7 +62,7 @@ export const editarSalaService = async (salaId: string, userId: number, datos: E
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede editarla");
 
         if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
-        
+
         const ahora = Date.now();
         const fechaPartidoNueva = datos.fechaHoraPartido ?? sala.fechaHoraPartido;
         const horasHastaElPartidoActual = (sala.fechaHoraPartido.getTime() - ahora) / (1000 * 60 * 60);
@@ -175,6 +180,7 @@ export const unirseSalaService = async (salaId: string, userId: number) => {
 
         if (!sala) throw errorHttp(404, "Sala no encontrada");
         if (!["ABIERTA", "COMPLETA"].includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
+        if (new Date(sala.fechaHoraPartido) <= new Date()) throw errorHttp(400, "No puedes unirte a un partido que ya finalizó o está en curso");
         if (sala.participantes?.some((p) => p.usuario?.id === userId)) throw errorHttp(409, "Ya formas parte de esta sala");
 
         const confirmados = sala.participantes?.filter((p) => p.estado === "CONFIRMADO").length ?? 0;
@@ -307,4 +313,60 @@ export const transferirOrganizadorService = async (
             nuevoOrganizadorId,
         };
     });
+};
+
+export const aceptarSolicitudService = async (
+    salaId: string,
+    participacionId: string,
+    organizadorId: number,
+) => {
+    // verificar que quien ejecuta sea el organizador de la sala
+    if (!(await esOrganizadorDeSala(salaId, organizadorId))) {
+        throw errorHttp(403, "Solo el organizador puede aceptar solicitudes")
+    }
+
+    // obtener la paricipacion solicitada
+    const participacion = await obtenerParticipacionPorId(participacionId);
+    if (!participacion) throw errorHttp(404, "Participación no encontrada");
+
+    // verificar que la participacion pertenezca a esta sala
+    if (participacion.sala.id !== salaId) {
+        throw errorHttp(404, "La participacion no corresponde a esta sala");
+    }
+
+    // verificar que la sala no estee cerrada
+    if (ESTADOS_CERRADOS.includes(participacion.sala.estado)) {
+        throw errorHttp(409, "La sala se encuentra cerrada");
+    }
+
+    //  Verificar que el rol sea SOLICITANTE
+    if (participacion.rol !== "SOLICITANTE") {
+        throw errorHttp(409, "Esta participación no es una solicitud pendiente de ingreso");
+    }
+
+    //  Verificar que el estado sea PENDIENTE
+    if (participacion.estado !== "PENDIENTE") {
+        throw errorHttp(409, "Esta solicitud ya fue procesada anteriormente");
+    }
+
+    //  Verificar disponibilidad de cupo
+    const confirmados = await contarParticipantesConfirmados(salaId);
+    if (confirmados >= participacion.sala.cuposTotales) {
+        throw errorHttp(409, "La sala está completa, no hay cupo disponible");
+    }
+
+    //  Aceptar: SOLICITANTE + PENDIENTE → TITULAR + CONFIRMADO
+    await actualizarRolParticipacion(participacionId, "TITULAR");
+
+    // Si la sala se llenó, actualizar su estado a COMPLETA
+    if (confirmados + 1 >= participacion.sala.cuposTotales) {
+        await actualizarEstadoSalaEnBD(salaId, "COMPLETA");
+    }
+
+    return {
+        mensaje: "Solicitud de ingreso aceptada correctamente",
+        participacionId,
+        nuevoRol: "TITULAR",
+        nuevoEstado: "CONFIRMADO",
+    };
 };
