@@ -8,6 +8,7 @@ import {
     actualizarEstadoSalaEnBD,
     contarParticipantesConfirmados,
     esOrganizadorDeSala,
+    baseParticipacionSalaRepo,
 } from "./sala.repository";
 import { BuscarSalasQuery, CrearSalaBody, EditarSalaBody } from "./sala.schema";
 import { Sala } from "./sala.entity";
@@ -15,7 +16,8 @@ import { AppDataSource } from "../../database/data-source";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
 
 const ESTADOS_CERRADOS = ["CANCELADA", "FINALIZADA"];
-
+const DURACION_PARTIDO_POR_DEFECTO_MINUTOS = 60;
+const MILISEGUNDOS_POR_MINUTO = 60000;
 const errorHttp = (status: number, mensaje: string) => Object.assign(new Error(mensaje), { status });
 
 export const buscarSalas = (filtros: BuscarSalasQuery, userId: number) => {
@@ -30,6 +32,30 @@ export const obtenerDetalleSalaService = async (salaId: string) => {
 };
 
 export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
+    const participacionesUsuario = await baseParticipacionSalaRepo.find({
+        where: { usuario: { id: userId }, estado: "CONFIRMADO" },
+        relations: { sala: true },
+    });
+
+    const inicioNuevo = new Date(data.fechaHoraPartido);
+    const duracion = data.duracionMinutos || DURACION_PARTIDO_POR_DEFECTO_MINUTOS;
+    const finNuevo = new Date(inicioNuevo.getTime() + duracion * MILISEGUNDOS_POR_MINUTO);
+
+    for (const part of participacionesUsuario) {
+        if (ESTADOS_CERRADOS.includes(part.sala.estado)) continue;
+
+        const inicioExistente = new Date(part.sala.fechaHoraPartido);
+        const duracionExistente = part.sala.duracionMinutos || DURACION_PARTIDO_POR_DEFECTO_MINUTOS;
+        const finExistente = new Date(inicioExistente.getTime() + duracionExistente * MILISEGUNDOS_POR_MINUTO);
+
+        if (inicioNuevo < finExistente && finNuevo > inicioExistente) {
+            throw errorHttp(
+                409, 
+                "No podés crear este partido porque ya participás en otra sala en ese horario."
+            );
+        }
+    }
+
     const sala = await crearNuevaSala(data, userId);
 
     await crearParticipacionEnSala(sala.id, userId, {
@@ -320,45 +346,36 @@ export const aceptarSolicitudService = async (
     participacionId: string,
     organizadorId: number,
 ) => {
-    // verificar que quien ejecuta sea el organizador de la sala
     if (!(await esOrganizadorDeSala(salaId, organizadorId))) {
         throw errorHttp(403, "Solo el organizador puede aceptar solicitudes")
     }
 
-    // obtener la paricipacion solicitada
     const participacion = await obtenerParticipacionPorId(participacionId);
     if (!participacion) throw errorHttp(404, "Participación no encontrada");
 
-    // verificar que la participacion pertenezca a esta sala
     if (participacion.sala.id !== salaId) {
         throw errorHttp(404, "La participacion no corresponde a esta sala");
     }
 
-    // verificar que la sala no estee cerrada
     if (ESTADOS_CERRADOS.includes(participacion.sala.estado)) {
         throw errorHttp(409, "La sala se encuentra cerrada");
     }
 
-    //  Verificar que el rol sea SOLICITANTE
     if (participacion.rol !== "SOLICITANTE") {
         throw errorHttp(409, "Esta participación no es una solicitud pendiente de ingreso");
     }
 
-    //  Verificar que el estado sea PENDIENTE
     if (participacion.estado !== "PENDIENTE") {
         throw errorHttp(409, "Esta solicitud ya fue procesada anteriormente");
     }
 
-    //  Verificar disponibilidad de cupo
     const confirmados = await contarParticipantesConfirmados(salaId);
     if (confirmados >= participacion.sala.cuposTotales) {
         throw errorHttp(409, "La sala está completa, no hay cupo disponible");
     }
 
-    //  Aceptar: SOLICITANTE + PENDIENTE → TITULAR + CONFIRMADO
     await actualizarRolParticipacion(participacionId, "TITULAR");
 
-    // Si la sala se llenó, actualizar su estado a COMPLETA
     if (confirmados + 1 >= participacion.sala.cuposTotales) {
         await actualizarEstadoSalaEnBD(salaId, "COMPLETA");
     }

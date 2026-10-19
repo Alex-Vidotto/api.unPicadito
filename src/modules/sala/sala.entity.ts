@@ -3,6 +3,7 @@ import { User } from '../user/user.entity';
 import { ParticipacionSala } from '../participacionSala/participacionSala.entity';
 import { EstadoSala } from '../../constants/type';
 import crypto from "crypto";
+import { input } from "zod/v4/core";
 
 @Entity('salas')
 export class Sala {
@@ -15,15 +16,18 @@ export class Sala {
     @Column({ type: 'text', nullable: true })
     descripcion: string;
 
-    @Column({ type: 'varchar', length: 50 })
-    nombreCancha: string;
+    @Column({ type: 'varchar', length: 50, nullable: true })
+    nombreCancha: string | null;
 
-    @Column({ type: 'varchar', length: 100 })
-    direccion: string;
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    direccion: string | null;
 
     @Index()
     @Column({ type: 'timestamp' })
     fechaHoraPartido: Date;
+
+    @Column({ type: 'int', default: 60 })
+    duracionMinutos: number;
 
     @Column({ type: 'int', default: 10 })
     cuposTotales: number;
@@ -46,7 +50,7 @@ export class Sala {
         }
     }
 
-    @Column({ type: 'point', srid: 4326 })
+    @Column({ type: 'point', srid: 4326 }) 
     @Index({ spatial: true })
     ubicacion: { x: number, y: number };
 

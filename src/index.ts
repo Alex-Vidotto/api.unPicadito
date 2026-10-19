@@ -1,10 +1,12 @@
+import "reflect-metadata";
 import express, { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
-import cors from 'cors';
+import cors from "cors";
 import reviewRoutes from "./modules/review/review.routes";
 import userRoutes from "./modules/user/user.routes";
 import friendshipRoutes from "./modules/friendship/friendship.routes";
 import salaRoutes from "./modules/sala/sala.routes";
+import { walletRoutes } from "./modules/wallet/wallet.routes";
 import { AppDataSource } from "./database/data-source";
 
 dotenv.config();
@@ -19,14 +21,15 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/friendships", friendshipRoutes);
 app.use("/api/salas", salaRoutes);
+app.use("/api/wallet", walletRoutes);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-    console.error("Error capturado:", err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-        success: false,
-        message: err.message || "Error interno del servidor",
-    });
+  console.error("Error capturado:", err.message);
+  const status = err.status || 500;
+  res.status(status).json({
+    success: false,
+    message: err.message || "Error interno del servidor",
+  });
 });
 
 AppDataSource.initialize()
