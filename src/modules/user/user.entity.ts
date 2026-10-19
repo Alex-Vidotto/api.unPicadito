@@ -12,6 +12,7 @@ import { PosicionCancha } from "../../constants/type";
 import { Sala } from "../sala/sala.entity";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
 import { Review } from "../review/review.entity";
+import type { Message } from "../messages/message.entity";
 
 @Entity("usuarios")
 export class User {
@@ -37,7 +38,7 @@ export class User {
   apodo?: string;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  fotoPerfilUrl?: string;
+  fotoPerfilUrl?: string | null;
 
   @Column({ type: "varchar", length: 30, default: "POLIFUNCIONAL" })
   posicionPrincipal!: PosicionCancha;
@@ -69,9 +70,15 @@ export class User {
   @OneToMany(() => Review, (review) => review.calificado)
   resenasRecibidas!: Review[];
 
+  @OneToMany('Message', (message: Message) => message.sender)
+  messagesSent!: Message[];
+
+  @OneToMany('Message', (message: Message) => message.receiver)
+  messagesReceived!: Message[];
+
   @Column({
     type: "double",
     default: 0.0,
   })
   saldoCredito: number;
-}
+} 

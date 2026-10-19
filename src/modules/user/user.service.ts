@@ -2,6 +2,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import * as userRepository from './user.repository';
 import { findPlayers, findUserById, findPublicUserById } from './user.repository.js';
+import type { PosicionCancha } from '../../constants/type';
+import type { User } from './user.entity';
 
 export interface RegisterDto {
     email: string;
@@ -14,10 +16,16 @@ export interface RegisterDto {
 }
 
 export interface UpdateProfileDto {
+    email?: string;
+    nombreUsuario?: string;
     nombre?: string;
     apellido?: string;
     apodo?: string;
-    fotoPerfilUrl?: string;
+    fotoPerfilUrl?: string | null;
+    posicionPrincipal?: PosicionCancha;
+    currentPassword?: string;
+    password?: string;
+    passwordConfirm?: string;
 }
 
 // Corregido: El Partial solo afecta a email y nombreUsuario. El password queda obligatorio.
@@ -98,15 +106,43 @@ export const getPublicUserProfile = async (userId: number) => {
 };
 
 export const updateUserProfile = async (userId: number, dto: UpdateProfileDto) => {
-    const user = findUserById(userId);
-    if (!user) throw Error("Usuario no encontrado.");
+    const user = await userRepository.findUserForUpdate(userId);
+    if (!user) throw new Error("Usuario no encontrado.");
 
-    const updateData: Partial<UpdateProfileDto> = {};
+    const updateData: Partial<User> = {};
+    if (dto.email !== undefined) {
+        const email = dto.email.toLowerCase().trim();
+        const existingUser = await userRepository.findByEmail(email);
+        if (existingUser && existingUser.id !== userId) {
+            throw new Error("El email ya está registrado.");
+        }
+        updateData.email = email;
+    }
+    if (dto.nombreUsuario !== undefined) {
+        const nombreUsuario = dto.nombreUsuario.trim();
+        const existingUser = await userRepository.findByUsername(nombreUsuario);
+        if (existingUser && existingUser.id !== userId) {
+            throw new Error("El nombre de usuario ya está registrado.");
+        }
+        updateData.nombreUsuario = nombreUsuario;
+    }
     if (dto.nombre !== undefined) updateData.nombre = dto.nombre.trim();
     if (dto.apellido !== undefined) updateData.apellido = dto.apellido.trim();
     if (dto.apodo !== undefined) updateData.apodo = dto.apodo.trim();
-    if (dto.fotoPerfilUrl !== undefined) updateData.fotoPerfilUrl = dto.fotoPerfilUrl.trim();
+    if (dto.fotoPerfilUrl !== undefined) updateData.fotoPerfilUrl = dto.fotoPerfilUrl?.trim() || null;
+    if (dto.posicionPrincipal !== undefined) updateData.posicionPrincipal = dto.posicionPrincipal;
+    if (dto.password !== undefined) {
+        if (!dto.currentPassword || !await bcrypt.compare(dto.currentPassword, user.passwordHash)) {
+            throw new Error("La contraseña actual es incorrecta.");
+        }
+        if (dto.password !== dto.passwordConfirm) {
+            throw new Error("Las nuevas contraseñas no coinciden.");
+        }
+        updateData.passwordHash = await bcrypt.hash(dto.password, 10);
+    }
 
-    const updatedUser = await userRepository.updateUser(userId, updateData);
+    await userRepository.updateUser(userId, updateData);
+    const updatedUser = await userRepository.findSafeUserById(userId);
+    if (!updatedUser) throw new Error("No se pudo recuperar el perfil actualizado.");
     return updatedUser;
 };

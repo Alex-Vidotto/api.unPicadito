@@ -3,7 +3,8 @@ export type PosicionCancha =
     | 'DEFENSOR'
     | 'MEDIOCAMPISTA'
     | 'DELANTERO'
-    | 'TODOTERRENO';
+    | 'TODOTERRENO'
+    | 'POLIFUNCIONAL';
 
 export type EstadoAmistad =
     | 'PENDIENTE'

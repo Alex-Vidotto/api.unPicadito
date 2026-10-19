@@ -1,4 +1,3 @@
-import { Repository } from "typeorm";
 import { AppDataSource } from "../../database/data-source";
 import { User } from "./user.entity";
 
@@ -55,13 +54,44 @@ export const findUserById = async (id: number) => {
       "user.reputacion",
       "user.creadoEn"
     ])
-    .leftJoinAndSelect("user.resenasRecibidas", "resenas") 
-    .leftJoinAndSelect("resenas.calificador", "calificador")
+    .leftJoinAndSelect("user.resenasRecibidas", "resenas")
+    .leftJoin("resenas.calificador", "calificador")
+    .addSelect([
+      "calificador.id",
+      "calificador.nombre",
+      "calificador.nombreUsuario",
+      "calificador.fotoPerfilUrl",
+    ])
 
     .where("user.id = :id", { id })
     .getOne();
 };
 
+export const findUserForUpdate = async (id: number) => {
+    return await getRepo().findOne({ where: { id } });
+};
+
+export const updateUser = async (id: number, updateData: Partial<User>): Promise<void> => {
+    await getRepo().update(id, updateData);
+};
+
+export const findSafeUserById = async (id: number) => {
+    return await getRepo().findOne({
+        where: { id },
+        select: {
+            id: true,
+            email: true,
+            nombreUsuario: true,
+            nombre: true,
+            apellido: true,
+            apodo: true,
+            fotoPerfilUrl: true,
+            posicionPrincipal: true,
+            reputacion: true,
+            creadoEn: true,
+        },
+    });
+};
 
 export const findPublicUserById = async (id: number) => {
   return await getRepo().findOne({
