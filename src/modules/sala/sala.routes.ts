@@ -90,4 +90,10 @@ router.patch(
     salaController.aceptarSolicitudController
 );
 
+router.patch(
+    "/:id/finalizar",
+    authenticateJWT,
+    validateMiddleware(salaIdParamsSchema, "params"),
+    salaController.finalizar,
+);
 export default router;

@@ -4,11 +4,12 @@ import {
     obtenerSalaConParticipantes,
     crearParticipacionEnSala,
     obtenerParticipacionPorId,
-    actualizarRolParticipacion,
+    actualizarEstadoYRolParticipacion,
     actualizarEstadoSalaEnBD,
     contarParticipantesConfirmados,
     esOrganizadorDeSala,
     baseParticipacionSalaRepo,
+    finalizarSalasVencidasEnBD
 } from "./sala.repository";
 import { BuscarSalasQuery, CrearSalaBody, EditarSalaBody } from "./sala.schema";
 import { Sala } from "./sala.entity";
@@ -18,6 +19,7 @@ import { ParticipacionSala } from "../participacionSala/participacionSala.entity
 const ESTADOS_CERRADOS = ["CANCELADA", "FINALIZADA"];
 const DURACION_PARTIDO_POR_DEFECTO_MINUTOS = 60;
 const MILISEGUNDOS_POR_MINUTO = 60000;
+const MINUTOS_PARA_FINALIZAR = 30;
 const errorHttp = (status: number, mensaje: string) => Object.assign(new Error(mensaje), { status });
 
 export const buscarSalas = (filtros: BuscarSalasQuery, userId: number) => {
@@ -26,6 +28,9 @@ export const buscarSalas = (filtros: BuscarSalasQuery, userId: number) => {
 };
 
 export const obtenerDetalleSalaService = async (salaId: string) => {
+    const limite = new Date(Date.now() - MINUTOS_PARA_FINALIZAR * MILISEGUNDOS_POR_MINUTO);
+    await finalizarSalasVencidasEnBD(limite, salaId);
+
     const sala = await obtenerSalaConParticipantes(salaId);
     if (!sala) throw errorHttp(404, "Sala no encontrada");
     return sala;
@@ -50,7 +55,7 @@ export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
 
         if (inicioNuevo < finExistente && finNuevo > inicioExistente) {
             throw errorHttp(
-                409, 
+                409,
                 "No podés crear este partido porque ya participás en otra sala en ese horario."
             );
         }
@@ -374,7 +379,7 @@ export const aceptarSolicitudService = async (
         throw errorHttp(409, "La sala está completa, no hay cupo disponible");
     }
 
-    await actualizarRolParticipacion(participacionId, "TITULAR");
+    await actualizarEstadoYRolParticipacion(participacionId, "TITULAR", "CONFIRMADO");
 
     if (confirmados + 1 >= participacion.sala.cuposTotales) {
         await actualizarEstadoSalaEnBD(salaId, "COMPLETA");
@@ -386,4 +391,45 @@ export const aceptarSolicitudService = async (
         nuevoRol: "TITULAR",
         nuevoEstado: "CONFIRMADO",
     };
+};
+
+export const finalizarSalaService = async (salaId: string, userId: number) => {
+    return AppDataSource.transaction(async (manager) => {
+        const sala = await manager.createQueryBuilder(Sala, "sala")
+            .setLock("pessimistic_write")
+            .where("sala.id = :salaId", { salaId })
+            .getOne();
+
+        if (!sala) throw errorHttp(404, "Sala no encontrada");
+
+        const esOrganizador = await manager.count(ParticipacionSala, {
+            where: {
+                sala: { id: salaId },
+                usuario: { id: userId },
+                rol: "ORGANIZADOR",
+                estado: "CONFIRMADO",
+            },
+        });
+        if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede finalizarla");
+
+        if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
+
+        const habilitadaDesde =
+            new Date(sala.fechaHoraPartido).getTime() + MINUTOS_PARA_FINALIZAR * MILISEGUNDOS_POR_MINUTO;
+        if (Date.now() < habilitadaDesde) {
+            throw errorHttp(
+                400,
+                `La sala solo puede finalizarse ${MINUTOS_PARA_FINALIZAR} minutos después del horario del partido`,
+            );
+        }
+
+        await manager.update(Sala, salaId, { estado: "FINALIZADA" });
+
+        return { salaId, estado: "FINALIZADA", mensaje: "Sala finalizada correctamente" };
+    });
+};
+
+export const finalizarSalasVencidasService = async (): Promise<number> => {
+    const limite = new Date(Date.now() - MINUTOS_PARA_FINALIZAR * MILISEGUNDOS_POR_MINUTO);
+    return finalizarSalasVencidasEnBD(limite);
 };
