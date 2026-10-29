@@ -40,3 +40,10 @@ export const ReviewService = {
     guardarResena,
     obtenerRankingJugador
 };
+
+export const obtenerRankingService = async (calificadoId: number) => {
+    const existe = await existeUsuario(AppDataSource.manager, calificadoId);
+    if (!existe) throw errorHttp(404, "Jugador no encontrado");
+
+    return calcularPromedio(AppDataSource.manager, calificadoId);
+};
