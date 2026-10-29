@@ -9,4 +9,8 @@ const router = Router();
 router.post("/", authenticateJWT, validateMiddleware(crearReviewSchema, "body"), reviewController.crear);
 router.get("/ranking/:id", validateMiddleware(rankingParamsSchema, "params"), reviewController.obtenerRanking);
 
+
+
+
+
 export default router;
