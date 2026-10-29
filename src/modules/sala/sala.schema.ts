@@ -18,6 +18,7 @@ export const buscarSalasQuerySchema = z.object({
     estadoDisponibilidad: z.enum(["DISPONIBLES", "LLENAS", "TODAS"]).default("TODAS"),
     esPublica: booleanQuery.optional(),
     permiteSuplentes: booleanQuery.optional(),
+    misSalas: booleanQuery.optional(),
     nombre: z.string().optional(),
     nombreCancha: z.string().optional(),
     limite: z.coerce.number().int().positive().max(100).default(20),

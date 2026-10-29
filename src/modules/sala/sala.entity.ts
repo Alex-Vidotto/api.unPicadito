@@ -3,7 +3,6 @@ import { User } from '../user/user.entity';
 import { ParticipacionSala } from '../participacionSala/participacionSala.entity';
 import { EstadoSala } from '../../constants/type';
 import crypto from "crypto";
-import { input } from "zod/v4/core";
 
 @Entity('salas')
 export class Sala {
@@ -41,8 +40,9 @@ export class Sala {
     @Column({ type: 'boolean', default: true })
     esPublica: boolean;
 
-    @Column({ type: 'varchar', length: 64, unique: true })
+    @Column({ type: 'varchar', length: 64, unique: true, select: false })
     tokenInvitacion: string;
+
     @BeforeInsert()
     generateToken() {
         if (!this.tokenInvitacion) {
@@ -67,6 +67,10 @@ export class Sala {
     @ManyToOne(() => User, (user) => user.salasCreadas, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'creador_id' })
     creador: User;
+
+    cuposOcupados?: number;
+    unidoPorUsuarioActual?: number;
+    solicitudPendiente?: number;
 
     @OneToMany(() => ParticipacionSala, (part) => part.sala)
     participantes: ParticipacionSala[];

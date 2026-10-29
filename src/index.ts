@@ -8,6 +8,7 @@ import friendshipRoutes from "./modules/friendship/friendship.routes";
 import salaRoutes from "./modules/sala/sala.routes";
 import { walletRoutes } from "./modules/wallet/wallet.routes";
 import { AppDataSource } from "./database/data-source";
+import { authenticateJWT } from "./middlewares/auth.middleware";
 import { iniciarSchedulerSalas } from "./modules/sala/sala.scheduler";
 
 dotenv.config();
@@ -20,8 +21,8 @@ app.use(cors());
 // Registro de rutas
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/friendships", friendshipRoutes);
-app.use("/api/salas", salaRoutes);
+app.use("/api/friendships", authenticateJWT, friendshipRoutes);
+app.use("/api/salas", authenticateJWT, salaRoutes);
 app.use("/api/wallet", walletRoutes);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

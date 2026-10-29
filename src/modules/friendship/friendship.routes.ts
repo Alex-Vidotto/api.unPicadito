@@ -1,16 +1,11 @@
 import { Router } from "express";
-import {
-  sendFriendshipRequest,
-  respondFriendship,
-} from "./friendship.controller";
-import { authenticateJWT } from "../../middlewares/auth.middleware";
+import * as friendshipController from "./friendship.controller";
+import { validateMiddleware } from "../../middlewares/validate.middleware";
+import { sendFriendshipSchema, respondFriendshipBodySchema, friendshipIdParamSchema } from "./friendship.schema";
 
 const router = Router();
 
-// POST /friendships (UP-045)
-router.post("/", authenticateJWT, sendFriendshipRequest);
-
-// PATCH /friendships/:id/respond (UP-046)
-router.patch("/:id/respond", authenticateJWT, respondFriendship);
+router.post("/", validateMiddleware(sendFriendshipSchema, "body"), friendshipController.sendFriendshipRequest);
+router.patch("/:id/respond", validateMiddleware(friendshipIdParamSchema, "params"), validateMiddleware(respondFriendshipBodySchema, "body"), friendshipController.respondFriendship);
 
 export default router;

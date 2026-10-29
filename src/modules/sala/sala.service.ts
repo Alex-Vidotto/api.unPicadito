@@ -3,11 +3,7 @@ import {
     crearNuevaSala,
     obtenerSalaConParticipantes,
     crearParticipacionEnSala,
-    obtenerParticipacionPorId,
     actualizarEstadoYRolParticipacion,
-    actualizarEstadoSalaEnBD,
-    contarParticipantesConfirmados,
-    esOrganizadorDeSala,
     baseParticipacionSalaRepo,
     finalizarSalasVencidasEnBD
 } from "./sala.repository";
@@ -15,8 +11,9 @@ import { BuscarSalasQuery, CrearSalaBody, EditarSalaBody } from "./sala.schema";
 import { Sala } from "./sala.entity";
 import { AppDataSource } from "../../database/data-source";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
+import { EstadoSala, ESTADO_SALA, ROL_EN_SALA, ESTADO_PARTICIPACION, ORIGEN_INGRESO } from "../../constants/type";
 
-const ESTADOS_CERRADOS = ["CANCELADA", "FINALIZADA"];
+const ESTADOS_CERRADOS: EstadoSala[] = [ESTADO_SALA.CANCELADA, ESTADO_SALA.FINALIZADA];
 const DURACION_PARTIDO_POR_DEFECTO_MINUTOS = 60;
 const MILISEGUNDOS_POR_MINUTO = 60000;
 const MINUTOS_PARA_FINALIZAR = 30;
@@ -38,7 +35,7 @@ export const obtenerDetalleSalaService = async (salaId: string) => {
 
 export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
     const participacionesUsuario = await baseParticipacionSalaRepo.find({
-        where: { usuario: { id: userId }, estado: "CONFIRMADO" },
+        where: { usuario: { id: userId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
         relations: { sala: true },
     });
 
@@ -61,21 +58,27 @@ export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
         }
     }
 
-    const sala = await crearNuevaSala(data, userId);
+    return await AppDataSource.transaction(async (manager) => {
+        const sala = await crearNuevaSala(data, userId, manager);
 
-    await crearParticipacionEnSala(sala.id, userId, {
-        estado: "CONFIRMADO",
-        rol: "ORGANIZADOR",
-        origenIngreso: "SOLICITUD_DIRECTA",
+        await crearParticipacionEnSala(
+            sala.id,
+            userId,
+            {
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
+                rol: ROL_EN_SALA.ORGANIZADOR,
+                origenIngreso: ORIGEN_INGRESO.SOLICITUD_DIRECTA,
+            },
+            manager
+        );
+
+        return sala;
     });
-
-    return sala;
 };
 
 export const editarSalaService = async (salaId: string, userId: number, datos: EditarSalaBody) => {
-    return AppDataSource.transaction(async (manager) => {
+    return await AppDataSource.transaction(async (manager) => {
         const sala = await manager.createQueryBuilder(Sala, "sala")
-            .leftJoinAndSelect("sala.creador", "creador")
             .setLock("pessimistic_write")
             .where("sala.id = :salaId", { salaId })
             .getOne();
@@ -86,8 +89,8 @@ export const editarSalaService = async (salaId: string, userId: number, datos: E
             where: {
                 sala: { id: salaId },
                 usuario: { id: userId },
-                rol: "ORGANIZADOR",
-                estado: "CONFIRMADO",
+                rol: ROL_EN_SALA.ORGANIZADOR,
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
             },
         });
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede editarla");
@@ -123,14 +126,14 @@ export const editarSalaService = async (salaId: string, userId: number, datos: E
 
         if (datos.cuposTotales !== undefined) {
             const participantesConfirmados = await manager.count(ParticipacionSala, {
-                where: { sala: { id: salaId }, estado: "CONFIRMADO" },
+                where: { sala: { id: salaId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
             });
 
             if (datos.cuposTotales < participantesConfirmados) {
                 throw errorHttp(409, "Los cupos totales no pueden ser menores que los participantes confirmados");
             }
 
-            datosActualizados.estado = participantesConfirmados >= datos.cuposTotales ? "COMPLETA" : "ABIERTA";
+            datosActualizados.estado = participantesConfirmados >= datos.cuposTotales ? ESTADO_SALA.COMPLETA : ESTADO_SALA.ABIERTA;
         }
 
         await manager.update(Sala, salaId, datosActualizados);
@@ -143,7 +146,7 @@ export const editarSalaService = async (salaId: string, userId: number, datos: E
 };
 
 export const cambiarEstadoSalaService = async (salaId: string, userId: number, motivo: string) => {
-    return AppDataSource.transaction(async (manager) => {
+    return await AppDataSource.transaction(async (manager) => {
         const sala = await manager.createQueryBuilder(Sala, "sala")
             .setLock("pessimistic_write")
             .where("sala.id = :salaId", { salaId })
@@ -156,19 +159,19 @@ export const cambiarEstadoSalaService = async (salaId: string, userId: number, m
             where: {
                 sala: { id: salaId },
                 usuario: { id: userId },
-                rol: "ORGANIZADOR",
-                estado: "CONFIRMADO",
+                rol: ROL_EN_SALA.ORGANIZADOR,
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
             },
         });
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede dar de baja");
 
-        await manager.update(Sala, salaId, { estado: "CANCELADA", motivoCancelacion: motivo });
+        await manager.update(Sala, salaId, { estado: ESTADO_SALA.CANCELADA, motivoCancelacion: motivo });
         return { mensaje: "Sala cancelada correctamente" };
     });
 };
 
 export const leaveSalaService = async (salaId: string, userId: number) => {
-    return AppDataSource.transaction(async (manager) => {
+    return await AppDataSource.transaction(async (manager) => {
         const sala = await manager.createQueryBuilder(Sala, "sala")
             .leftJoinAndSelect("sala.participantes", "participacion")
             .leftJoinAndSelect("participacion.usuario", "usuario")
@@ -181,18 +184,18 @@ export const leaveSalaService = async (salaId: string, userId: number) => {
 
         const participacion = sala.participantes?.find((p) => p.usuario?.id === userId);
         if (!participacion) throw errorHttp(404, "No estás participando en esta sala");
-        if (participacion.rol === "ORGANIZADOR" && participacion.estado === "CONFIRMADO") {
+        if (participacion.rol === ROL_EN_SALA.ORGANIZADOR && participacion.estado === ESTADO_PARTICIPACION.CONFIRMADO) {
             throw errorHttp(409, "El organizador no puede salir de sala, debe transferir el rol o cancelarla.");
         }
 
         await manager.delete(ParticipacionSala, participacion.id);
 
-        if (sala.estado === "COMPLETA") {
+        if (sala.estado === ESTADO_SALA.COMPLETA) {
             const confirmados = await manager.count(ParticipacionSala, {
-                where: { sala: { id: salaId }, estado: "CONFIRMADO" },
+                where: { sala: { id: salaId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
             });
             if (confirmados < sala.cuposTotales) {
-                await manager.update(Sala, salaId, { estado: "ABIERTA" });
+                await manager.update(Sala, salaId, { estado: ESTADO_SALA.ABIERTA });
             }
         }
 
@@ -201,7 +204,7 @@ export const leaveSalaService = async (salaId: string, userId: number) => {
 };
 
 export const unirseSalaService = async (salaId: string, userId: number) => {
-    return AppDataSource.transaction(async (manager) => {
+    return await AppDataSource.transaction(async (manager) => {
         const sala = await manager.createQueryBuilder(Sala, "sala")
             .leftJoinAndSelect("sala.participantes", "participacion")
             .leftJoinAndSelect("participacion.usuario", "usuario")
@@ -210,22 +213,40 @@ export const unirseSalaService = async (salaId: string, userId: number) => {
             .getOne();
 
         if (!sala) throw errorHttp(404, "Sala no encontrada");
-        if (!["ABIERTA", "COMPLETA"].includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
-        if (new Date(sala.fechaHoraPartido) <= new Date()) throw errorHttp(400, "No puedes unirte a un partido que ya finalizó o está en curso");
-        if (sala.participantes?.some((p) => p.usuario?.id === userId)) throw errorHttp(409, "Ya formas parte de esta sala");
+        if (sala.estado !== ESTADO_SALA.ABIERTA && sala.estado !== ESTADO_SALA.COMPLETA) {
+            throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
+        }
+        if (new Date(sala.fechaHoraPartido) <= new Date()) {
+            throw errorHttp(400, "No puedes unirte a un partido que ya finalizó o está en curso");
+        }
+        if (sala.participantes?.some((p) => p.usuario?.id === userId)) {
+            throw errorHttp(409, "Ya formas parte de esta sala");
+        }
 
-        const confirmados = sala.participantes?.filter((p) => p.estado === "CONFIRMADO").length ?? 0;
+        const confirmados = sala.participantes?.filter((p) => p.estado === ESTADO_PARTICIPACION.CONFIRMADO).length ?? 0;
         const hayCupo = confirmados < sala.cuposTotales;
 
-        if (!hayCupo && !sala.permiteSuplentes) throw errorHttp(409, "La sala está completa");
+        if (!hayCupo && !sala.permiteSuplentes) {
+            throw errorHttp(409, "La sala está completa");
+        }
+
+        if (!hayCupo) {
+            const suplentesConfirmados = sala.participantes?.filter(
+                (p) => p.rol === ROL_EN_SALA.SUPLENTE && p.estado === ESTADO_PARTICIPACION.CONFIRMADO
+            ).length ?? 0;
+
+            if (suplentesConfirmados >= sala.cuposSuplentesMax) {
+                throw errorHttp(409, "La sala alcanzó el máximo de suplentes permitido");
+            }
+        }
 
         if (!sala.esPublica) {
             const nuevaParticipacion = manager.create(ParticipacionSala, {
                 sala: { id: salaId },
                 usuario: { id: userId },
-                estado: "PENDIENTE",
-                rol: "SOLICITANTE",
-                origenIngreso: "SOLICITUD_DIRECTA",
+                estado: ESTADO_PARTICIPACION.PENDIENTE,
+                rol: ROL_EN_SALA.SOLICITANTE,
+                origenIngreso: ORIGEN_INGRESO.SOLICITUD_DIRECTA,
             });
             const participacion = await manager.save(nuevaParticipacion);
 
@@ -236,18 +257,18 @@ export const unirseSalaService = async (salaId: string, userId: number) => {
             };
         }
 
-        const rol = hayCupo ? "TITULAR" : "SUPLENTE";
+        const rol = hayCupo ? ROL_EN_SALA.TITULAR : ROL_EN_SALA.SUPLENTE;
         const nuevaParticipacion = manager.create(ParticipacionSala, {
             sala: { id: salaId },
             usuario: { id: userId },
-            estado: "CONFIRMADO",
+            estado: ESTADO_PARTICIPACION.CONFIRMADO,
             rol,
-            origenIngreso: "SOLICITUD_DIRECTA",
+            origenIngreso: ORIGEN_INGRESO.SOLICITUD_DIRECTA,
         });
         const participacion = await manager.save(nuevaParticipacion);
 
-        if (rol === "TITULAR" && confirmados + 1 >= sala.cuposTotales) {
-            await manager.update(Sala, salaId, { estado: "COMPLETA" });
+        if (rol === ROL_EN_SALA.TITULAR && confirmados + 1 >= sala.cuposTotales) {
+            await manager.update(Sala, salaId, { estado: ESTADO_SALA.COMPLETA });
         }
 
         return { mensaje: "Te uniste a la sala correctamente", rol, participacion };
@@ -255,7 +276,7 @@ export const unirseSalaService = async (salaId: string, userId: number) => {
 };
 
 export const expulsarJugadorService = async (salaId: string, userIdAExpulsar: number, organizadorId: number) => {
-    return AppDataSource.transaction(async (manager) => {
+    return await AppDataSource.transaction(async (manager) => {
         const sala = await manager.createQueryBuilder(Sala, "sala")
             .leftJoinAndSelect("sala.participantes", "participacion")
             .leftJoinAndSelect("participacion.usuario", "usuario")
@@ -270,8 +291,8 @@ export const expulsarJugadorService = async (salaId: string, userIdAExpulsar: nu
             where: {
                 sala: { id: salaId },
                 usuario: { id: organizadorId },
-                rol: "ORGANIZADOR",
-                estado: "CONFIRMADO",
+                rol: ROL_EN_SALA.ORGANIZADOR,
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
             },
         });
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede expulsar jugadores");
@@ -284,12 +305,12 @@ export const expulsarJugadorService = async (salaId: string, userIdAExpulsar: nu
 
         await manager.delete(ParticipacionSala, participacion.id);
 
-        if (sala.estado === "COMPLETA") {
+        if (sala.estado === ESTADO_SALA.COMPLETA) {
             const confirmados = await manager.count(ParticipacionSala, {
-                where: { sala: { id: salaId }, estado: "CONFIRMADO" },
+                where: { sala: { id: salaId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
             });
             if (confirmados < sala.cuposTotales) {
-                await manager.update(Sala, salaId, { estado: "ABIERTA" });
+                await manager.update(Sala, salaId, { estado: ESTADO_SALA.ABIERTA });
             }
         }
 
@@ -306,7 +327,7 @@ export const transferirOrganizadorService = async (
     userId: number,
     nuevoOrganizadorId: number,
 ) => {
-    return AppDataSource.transaction(async (manager) => {
+    return await AppDataSource.transaction(async (manager) => {
         const sala = await manager.createQueryBuilder(Sala, "sala")
             .setLock("pessimistic_write")
             .where("sala.id = :salaId", { salaId })
@@ -320,8 +341,8 @@ export const transferirOrganizadorService = async (
             where: {
                 sala: { id: salaId },
                 usuario: { id: userId },
-                rol: "ORGANIZADOR",
-                estado: "CONFIRMADO",
+                rol: ROL_EN_SALA.ORGANIZADOR,
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
             },
         });
         if (!organizadorActual) throw errorHttp(403, "Solo el organizador de la sala puede transferir el rol");
@@ -330,13 +351,13 @@ export const transferirOrganizadorService = async (
             where: {
                 sala: { id: salaId },
                 usuario: { id: nuevoOrganizadorId },
-                estado: "CONFIRMADO",
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
             },
         });
         if (!nuevoOrganizador) throw errorHttp(404, "El nuevo organizador debe ser un participante confirmado de la sala");
 
-        await manager.update(ParticipacionSala, organizadorActual.id, { rol: "TITULAR" });
-        await manager.update(ParticipacionSala, nuevoOrganizador.id, { rol: "ORGANIZADOR" });
+        await manager.update(ParticipacionSala, organizadorActual.id, { rol: ROL_EN_SALA.TITULAR });
+        await manager.update(ParticipacionSala, nuevoOrganizador.id, { rol: ROL_EN_SALA.ORGANIZADOR });
 
         return {
             message: "Organización transferida correctamente",
@@ -351,46 +372,106 @@ export const aceptarSolicitudService = async (
     participacionId: string,
     organizadorId: number,
 ) => {
-    if (!(await esOrganizadorDeSala(salaId, organizadorId))) {
-        throw errorHttp(403, "Solo el organizador puede aceptar solicitudes")
-    }
+    return await AppDataSource.transaction(async (manager) => {
+        const sala = await manager.createQueryBuilder(Sala, "sala")
+            .setLock("pessimistic_write")
+            .where("sala.id = :salaId", { salaId })
+            .getOne();
 
-    const participacion = await obtenerParticipacionPorId(participacionId);
-    if (!participacion) throw errorHttp(404, "Participación no encontrada");
+        if (!sala) throw errorHttp(404, "Sala no encontrada");
+        if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
 
-    if (participacion.sala.id !== salaId) {
-        throw errorHttp(404, "La participacion no corresponde a esta sala");
-    }
+        const esOrganizador = await manager.count(ParticipacionSala, {
+            where: {
+                sala: { id: salaId },
+                usuario: { id: organizadorId },
+                rol: ROL_EN_SALA.ORGANIZADOR,
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
+            },
+        });
+        if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede aceptar solicitudes");
 
-    if (ESTADOS_CERRADOS.includes(participacion.sala.estado)) {
-        throw errorHttp(409, "La sala se encuentra cerrada");
-    }
+        const participacion = await manager.findOne(ParticipacionSala, {
+            where: { id: participacionId },
+            relations: { sala: true, usuario: true },
+        });
 
-    if (participacion.rol !== "SOLICITANTE") {
-        throw errorHttp(409, "Esta participación no es una solicitud pendiente de ingreso");
-    }
+        if (!participacion) throw errorHttp(404, "Participación no encontrada");
+        if (participacion.sala.id !== salaId) {
+            throw errorHttp(404, "La participación no corresponde a esta sala");
+        }
+        if (participacion.rol !== ROL_EN_SALA.SOLICITANTE) {
+            throw errorHttp(409, "Esta participación no es una solicitud de ingreso");
+        }
+        if (participacion.estado !== ESTADO_PARTICIPACION.PENDIENTE) {
+            throw errorHttp(409, "Esta solicitud ya fue procesada anteriormente");
+        }
 
-    if (participacion.estado !== "PENDIENTE") {
-        throw errorHttp(409, "Esta solicitud ya fue procesada anteriormente");
-    }
+        const confirmados = await manager.count(ParticipacionSala, {
+            where: { sala: { id: salaId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
+        });
 
-    const confirmados = await contarParticipantesConfirmados(salaId);
-    if (confirmados >= participacion.sala.cuposTotales) {
-        throw errorHttp(409, "La sala está completa, no hay cupo disponible");
-    }
+        if (confirmados >= sala.cuposTotales) {
+            throw errorHttp(409, "La sala está completa, no hay cupos titulares disponibles");
+        }
 
-    await actualizarEstadoYRolParticipacion(participacionId, "TITULAR", "CONFIRMADO");
+        // Aceptamos actualizando rol a TITULAR y estado a CONFIRMADO
+        await actualizarEstadoYRolParticipacion(
+            participacionId,
+            ROL_EN_SALA.TITULAR,
+            ESTADO_PARTICIPACION.CONFIRMADO,
+            manager,
+        );
 
-    if (confirmados + 1 >= participacion.sala.cuposTotales) {
-        await actualizarEstadoSalaEnBD(salaId, "COMPLETA");
-    }
+        if (confirmados + 1 >= sala.cuposTotales) {
+            await manager.update(Sala, salaId, { estado: ESTADO_SALA.COMPLETA });
+        }
 
-    return {
-        mensaje: "Solicitud de ingreso aceptada correctamente",
-        participacionId,
-        nuevoRol: "TITULAR",
-        nuevoEstado: "CONFIRMADO",
-    };
+        return {
+            mensaje: "Solicitud de ingreso aceptada correctamente",
+            participacionId,
+            nuevoRol: ROL_EN_SALA.TITULAR,
+            nuevoEstado: ESTADO_PARTICIPACION.CONFIRMADO,
+        };
+    });
+};
+
+export const rechazarSolicitudService = async (
+    salaId: string,
+    participacionId: string,
+    organizadorId: number,
+) => {
+    return await AppDataSource.transaction(async (manager) => {
+        const esOrganizador = await manager.count(ParticipacionSala, {
+            where: {
+                sala: { id: salaId },
+                usuario: { id: organizadorId },
+                rol: ROL_EN_SALA.ORGANIZADOR,
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
+            },
+        });
+        if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede rechazar solicitudes");
+
+        const participacion = await manager.findOne(ParticipacionSala, {
+            where: { id: participacionId },
+            relations: { sala: true },
+        });
+
+        if (!participacion) throw errorHttp(404, "Participación no encontrada");
+        if (participacion.sala.id !== salaId) {
+            throw errorHttp(404, "La participación no corresponde a esta sala");
+        }
+        if (participacion.rol !== ROL_EN_SALA.SOLICITANTE) {
+            throw errorHttp(409, "Esta participación no es una solicitud de ingreso");
+        }
+
+        await manager.delete(ParticipacionSala, participacionId);
+
+        return {
+            mensaje: "Solicitud de ingreso rechazada correctamente",
+            participacionId,
+        };
+    });
 };
 
 export const finalizarSalaService = async (salaId: string, userId: number) => {
@@ -406,8 +487,8 @@ export const finalizarSalaService = async (salaId: string, userId: number) => {
             where: {
                 sala: { id: salaId },
                 usuario: { id: userId },
-                rol: "ORGANIZADOR",
-                estado: "CONFIRMADO",
+                rol: ROL_EN_SALA.ORGANIZADOR,
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
             },
         });
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede finalizarla");
@@ -423,9 +504,9 @@ export const finalizarSalaService = async (salaId: string, userId: number) => {
             );
         }
 
-        await manager.update(Sala, salaId, { estado: "FINALIZADA" });
+        await manager.update(Sala, salaId, { estado: ESTADO_SALA.FINALIZADA });
 
-        return { salaId, estado: "FINALIZADA", mensaje: "Sala finalizada correctamente" };
+        return { salaId, estado: ESTADO_SALA.FINALIZADA, mensaje: "Sala finalizada correctamente" };
     });
 };
 

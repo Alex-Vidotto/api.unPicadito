@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
-
-export type FriendshipStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
+import { type FriendshipStatus, FRIENDSHIP_STATUS } from '../../constants/type';
 
 @Entity('friendships')
 export class FriendshipEntity {
@@ -13,6 +12,6 @@ export class FriendshipEntity {
   @Column({ type: 'int' })
   receiverId: number;
 
-  @Column({ type: 'varchar', default: 'PENDING' })
+  @Column({ type: 'varchar', default: FRIENDSHIP_STATUS.PENDING })
   status: FriendshipStatus;
 }
