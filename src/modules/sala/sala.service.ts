@@ -65,7 +65,7 @@ export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
         fechaInicioNuevo.getTime() + DURACION_PARTIDO_POR_DEFECTO_MINUTOS * MILISEGUNDOS_POR_MINUTO
     );
 
-    const misSalas = await buscarSalasConFiltros({ misSalas: true } as any, [], userId);
+    const misSalas = await buscarSalasConFiltros({ misSalas: true, pagina: 1, limite: 100 } as any, [], userId);
 
     for (const salaExistente of misSalas.salas) {
         const fechaInicioExistente = new Date(salaExistente.fechaHoraPartido);
