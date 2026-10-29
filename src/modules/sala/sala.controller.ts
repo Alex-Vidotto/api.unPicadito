@@ -17,7 +17,8 @@ import {
     editarSalaService,
     obtenerDetalleSalaService,
     transferirOrganizadorService,
-    aceptarSolicitudService
+    aceptarSolicitudService,
+    finalizarSalaService
 } from "./sala.service";
 
 const responderError = (res: Response, error: unknown): void => {
@@ -145,6 +146,15 @@ export const aceptarSolicitudController = async (req: Request, res: Response) =>
 
         const resultado = await aceptarSolicitudService(salaId, participacionId, organizadorId);
 
+        res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
+
+export const finalizar = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const resultado = await finalizarSalaService(req.params.id as string, req.user!.id);
         res.status(200).json({ success: true, data: resultado });
     } catch (error) {
         responderError(res, error);

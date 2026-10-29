@@ -8,6 +8,7 @@ import friendshipRoutes from "./modules/friendship/friendship.routes";
 import salaRoutes from "./modules/sala/sala.routes";
 import { walletRoutes } from "./modules/wallet/wallet.routes";
 import { AppDataSource } from "./database/data-source";
+import { iniciarSchedulerSalas } from "./modules/sala/sala.scheduler";
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ AppDataSource.initialize()
     app.listen(process.env.PORT || 8080, () => {
       console.log(`Servidor en puerto ${process.env.PORT || 8080}`);
     });
+    iniciarSchedulerSalas();
   })
   .catch((err: Error) => {
     console.error("Error al conectar:", err);

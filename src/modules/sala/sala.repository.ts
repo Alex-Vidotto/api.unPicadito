@@ -185,8 +185,22 @@ export const obtenerParticipacionPorId = (participacionId: string) =>
         relations: { usuario: true, sala: true },
     });
 
-export const actualizarEstadoYRolPArticipacion = (
+export const actualizarEstadoYRolParticipacion = (
     participacionId: string,
     rol: RolEnSala,
     estado: EstadoParticipacion) =>
     baseParticipacionSalaRepo.update(participacionId, { rol, estado });
+
+export const finalizarSalasVencidasEnBD = async (limite: Date, salaId?: string): Promise<number> => {
+    const query = baseSalaRepo
+        .createQueryBuilder()
+        .update(Sala)
+        .set({ estado: "FINALIZADA" })
+        .where("estado IN (:...estados)", { estados: ["ABIERTA", "COMPLETA"] })
+        .andWhere("fechaHoraPartido <= :limite", { limite });
+
+    if (salaId) query.andWhere("id = :salaId", { salaId });
+
+    const resultado = await query.execute();
+    return resultado.affected ?? 0;
+};
