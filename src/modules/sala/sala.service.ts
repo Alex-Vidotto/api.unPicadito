@@ -1,4 +1,12 @@
-import { buscarSalasConFiltros, crearNuevaSala, obtenerSalaConParticipantes, crearParticipacionEnSala, baseParticipacionSalaRepo } from "./sala.repository";
+import {
+    buscarSalasConFiltros,
+    crearNuevaSala,
+    obtenerSalaConParticipantes,
+    crearParticipacionEnSala,
+    actualizarEstadoYRolParticipacion,
+    baseParticipacionSalaRepo,
+    finalizarSalasVencidasEnBD
+} from "./sala.repository";
 import { BuscarSalasQuery, CrearSalaBody, EditarSalaBody } from "./sala.schema";
 import { Sala } from "./sala.entity";
 import { AppDataSource } from "../../database/data-source";
@@ -8,6 +16,7 @@ import { EstadoSala, ESTADO_SALA, ROL_EN_SALA, ESTADO_PARTICIPACION, ORIGEN_INGR
 const ESTADOS_CERRADOS: EstadoSala[] = [ESTADO_SALA.CANCELADA, ESTADO_SALA.FINALIZADA];
 const DURACION_PARTIDO_POR_DEFECTO_MINUTOS = 60;
 const MILISEGUNDOS_POR_MINUTO = 60000;
+const MINUTOS_PARA_FINALIZAR = 30;
 const errorHttp = (status: number, mensaje: string) => Object.assign(new Error(mensaje), { status });
 
 export const buscarSalas = (filtros: BuscarSalasQuery, userId: number) => {
@@ -16,6 +25,9 @@ export const buscarSalas = (filtros: BuscarSalasQuery, userId: number) => {
 };
 
 export const obtenerDetalleSalaService = async (salaId: string) => {
+    const limite = new Date(Date.now() - MINUTOS_PARA_FINALIZAR * MILISEGUNDOS_POR_MINUTO);
+    await finalizarSalasVencidasEnBD(limite, salaId);
+
     const sala = await obtenerSalaConParticipantes(salaId);
     if (!sala) throw errorHttp(404, "Sala no encontrada");
     return sala;
@@ -40,7 +52,7 @@ export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
 
         if (inicioNuevo < finExistente && finNuevo > inicioExistente) {
             throw errorHttp(
-                409, 
+                409,
                 "No podés crear este partido porque ya participás en otra sala en ese horario."
             );
         }
@@ -404,10 +416,12 @@ export const aceptarSolicitudService = async (
         }
 
         // Aceptamos actualizando rol a TITULAR y estado a CONFIRMADO
-        await manager.update(ParticipacionSala, participacionId, {
-            rol: ROL_EN_SALA.TITULAR,
-            estado: ESTADO_PARTICIPACION.CONFIRMADO,
-        });
+        await actualizarEstadoYRolParticipacion(
+            participacionId,
+            ROL_EN_SALA.TITULAR,
+            ESTADO_PARTICIPACION.CONFIRMADO,
+            manager,
+        );
 
         if (confirmados + 1 >= sala.cuposTotales) {
             await manager.update(Sala, salaId, { estado: ESTADO_SALA.COMPLETA });
@@ -458,4 +472,45 @@ export const rechazarSolicitudService = async (
             participacionId,
         };
     });
+};
+
+export const finalizarSalaService = async (salaId: string, userId: number) => {
+    return AppDataSource.transaction(async (manager) => {
+        const sala = await manager.createQueryBuilder(Sala, "sala")
+            .setLock("pessimistic_write")
+            .where("sala.id = :salaId", { salaId })
+            .getOne();
+
+        if (!sala) throw errorHttp(404, "Sala no encontrada");
+
+        const esOrganizador = await manager.count(ParticipacionSala, {
+            where: {
+                sala: { id: salaId },
+                usuario: { id: userId },
+                rol: ROL_EN_SALA.ORGANIZADOR,
+                estado: ESTADO_PARTICIPACION.CONFIRMADO,
+            },
+        });
+        if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede finalizarla");
+
+        if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
+
+        const habilitadaDesde =
+            new Date(sala.fechaHoraPartido).getTime() + MINUTOS_PARA_FINALIZAR * MILISEGUNDOS_POR_MINUTO;
+        if (Date.now() < habilitadaDesde) {
+            throw errorHttp(
+                400,
+                `La sala solo puede finalizarse ${MINUTOS_PARA_FINALIZAR} minutos después del horario del partido`,
+            );
+        }
+
+        await manager.update(Sala, salaId, { estado: ESTADO_SALA.FINALIZADA });
+
+        return { salaId, estado: ESTADO_SALA.FINALIZADA, mensaje: "Sala finalizada correctamente" };
+    });
+};
+
+export const finalizarSalasVencidasService = async (): Promise<number> => {
+    const limite = new Date(Date.now() - MINUTOS_PARA_FINALIZAR * MILISEGUNDOS_POR_MINUTO);
+    return finalizarSalasVencidasEnBD(limite);
 };

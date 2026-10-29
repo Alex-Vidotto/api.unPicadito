@@ -1,6 +1,26 @@
 import { Request, Response } from "express";
-import { BuscarSalasQuery, CrearSalaBody, EliminarSalaBody, EditarSalaBody, TransferirOrganizadorBody, AceptarSolicitudParams } from "./sala.schema";
-import { buscarSalas, crearSalaService, cambiarEstadoSalaService, unirseSalaService, leaveSalaService, expulsarJugadorService, editarSalaService, obtenerDetalleSalaService, transferirOrganizadorService, aceptarSolicitudService, rechazarSolicitudService } from "./sala.service";
+import {
+    BuscarSalasQuery,
+    CrearSalaBody,
+    EliminarSalaBody,
+    EditarSalaBody,
+    TransferirOrganizadorBody,
+    AceptarSolicitudParams
+} from "./sala.schema";
+import {
+    buscarSalas,
+    crearSalaService,
+    cambiarEstadoSalaService,
+    unirseSalaService,
+    leaveSalaService,
+    expulsarJugadorService,
+    editarSalaService,
+    obtenerDetalleSalaService,
+    transferirOrganizadorService,
+    aceptarSolicitudService,
+    rechazarSolicitudService,
+    finalizarSalaService
+} from "./sala.service";
 
 const responderError = (res: Response, error: unknown) => {
     if (
@@ -146,6 +166,15 @@ export const rechazarSolicitudController = async (req: Request, res: Response) =
         const resultado = await rechazarSolicitudService(salaId, participacionId, organizadorId);
 
         return res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
+
+export const finalizar = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const resultado = await finalizarSalaService(req.params.id as string, req.user!.id);
+        res.status(200).json({ success: true, data: resultado });
     } catch (error) {
         responderError(res, error);
     }

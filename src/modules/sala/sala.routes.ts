@@ -17,4 +17,9 @@ router.patch("/:id/transferir-organizador", validateMiddleware(salaIdParamsSchem
 router.patch("/:id/solicitudes/:participacionId/aceptar", validateMiddleware(aceptarSolicitudParamsSchema, "params"), salaController.aceptarSolicitudController);
 router.patch("/:id/solicitudes/:participacionId/rechazar", validateMiddleware(aceptarSolicitudParamsSchema, "params"), salaController.rechazarSolicitudController);
 
+router.patch(
+    "/:id/finalizar",
+    validateMiddleware(salaIdParamsSchema, "params"),
+    salaController.finalizar,
+);
 export default router;

@@ -1,4 +1,5 @@
 import { AppDataSource } from "../../database/data-source";
+import type { EntityManager } from "typeorm";
 import { Sala } from "./sala.entity";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
 import { BuscarSalasQuery, CrearSalaBody } from "./sala.schema";
@@ -192,10 +193,24 @@ export const actualizarEstadoYRolParticipacion = async (
     participacionId: string,
     rol: RolEnSala,
     estado: EstadoParticipacion,
-    manager?: any
+    manager?: EntityManager
 ) => {
     const repositorio = manager ? manager.getRepository(ParticipacionSala) : baseParticipacionSalaRepo;
     return await repositorio.update(participacionId, { rol, estado });
 };
 
 export const actualizarEstadoYRolPArticipacion = actualizarEstadoYRolParticipacion;
+
+export const finalizarSalasVencidasEnBD = async (limite: Date, salaId?: string): Promise<number> => {
+    const query = baseSalaRepo
+        .createQueryBuilder()
+        .update(Sala)
+        .set({ estado: ESTADO_SALA.FINALIZADA })
+        .where("estado IN (:...estados)", { estados: [ESTADO_SALA.ABIERTA, ESTADO_SALA.COMPLETA] })
+        .andWhere("fechaHoraPartido <= :limite", { limite });
+
+    if (salaId) query.andWhere("id = :salaId", { salaId });
+
+    const resultado = await query.execute();
+    return resultado.affected ?? 0;
+};
