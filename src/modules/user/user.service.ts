@@ -33,7 +33,10 @@ export type LoginDto = Partial<Pick<RegisterDto, "email" | "nombreUsuario">> & P
 
 // --- HELPER INTERNO (DRY) ---
 const generateAuthResponse = (user: any) => {
-    const secret = process.env.JWT_SECRET || "mi_secreto_unico_compartido";
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error("Falta configurar JWT_SECRET en las variables de entorno.");
+    }
     const token = jwt.sign(
         { id: user.id, email: user.email, nombreUsuario: user.nombreUsuario },
         secret,
@@ -66,8 +69,8 @@ export const loginUser = async (dto: LoginDto) => {
     if (!email && !nombreUsuario) throw new Error("Debes proveer un email o nombre de usuario.");
 
     const user = email
-        ? await userRepository.findByEmail(email)
-        : await userRepository.findByUsername(nombreUsuario!);
+        ? await userRepository.findByEmailConPassword(email)
+        : await userRepository.findByUsernameConPassword(nombreUsuario!);
 
     if (!user) throw new Error("Credenciales inválidas.");
 
@@ -78,11 +81,11 @@ export const loginUser = async (dto: LoginDto) => {
     return generateAuthResponse(user);
 };
 
-export const searchPlayers = async (searchTerm?: string) => {
+export const searchPlayers = async (searchTerm?: string, pagina: number = 1, limite: number = 12) => {
     const cleanTerm = searchTerm?.trim();
     if (cleanTerm && cleanTerm.length < 2) throw new Error("El término de búsqueda debe tener al menos 2 caracteres.");
 
-    return await userRepository.findPlayers({ term: cleanTerm });
+    return await userRepository.findPlayers({ term: cleanTerm, pagina, limite });
 };
 
 export const getUserProfile = async (userId: number) => {

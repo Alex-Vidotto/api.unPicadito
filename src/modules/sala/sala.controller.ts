@@ -1,26 +1,8 @@
 import { Request, Response } from "express";
-import {
-    BuscarSalasQuery,
-    CrearSalaBody,
-    EliminarSalaBody,
-    EditarSalaBody,
-    TransferirOrganizadorBody,
-    AceptarSolicitudParams
-} from "./sala.schema";
-import {
-    buscarSalas,
-    crearSalaService,
-    cambiarEstadoSalaService,
-    unirseSalaService,
-    leaveSalaService,
-    expulsarJugadorService,
-    editarSalaService,
-    obtenerDetalleSalaService,
-    transferirOrganizadorService,
-    aceptarSolicitudService
-} from "./sala.service";
+import { BuscarSalasQuery, CrearSalaBody, EliminarSalaBody, EditarSalaBody, TransferirOrganizadorBody, AceptarSolicitudParams } from "./sala.schema";
+import { buscarSalas, crearSalaService, cambiarEstadoSalaService, unirseSalaService, leaveSalaService, expulsarJugadorService, editarSalaService, obtenerDetalleSalaService, transferirOrganizadorService, aceptarSolicitudService, rechazarSolicitudService } from "./sala.service";
 
-const responderError = (res: Response, error: unknown): void => {
+const responderError = (res: Response, error: unknown) => {
     if (
         typeof error === "object" &&
         error !== null &&
@@ -37,17 +19,21 @@ const responderError = (res: Response, error: unknown): void => {
     res.status(500).json({ success: false, message: "Error interno del servidor" });
 };
 
-export const buscar = async (req: Request, res: Response): Promise<void> => {
+export const buscar = async (req: Request, res: Response) => {
     try {
         const filtros = req.query as unknown as BuscarSalasQuery;
-        const salas = await buscarSalas(filtros, req.user!.id);
-        res.status(200).json({ success: true, data: salas });
+        const resultado = await buscarSalas(filtros, req.user!.id);
+        res.status(200).json({
+            success: true,
+            data: resultado.salas,
+            paginacion: resultado.paginacion,
+        });
     } catch (error) {
         responderError(res, error);
     }
 };
 
-export const obtenerPorId = async (req: Request, res: Response): Promise<void> => {
+export const obtenerPorId = async (req: Request, res: Response) => {
     try {
         const sala = await obtenerDetalleSalaService(req.params.id as string);
         res.status(200).json({ success: true, data: sala });
@@ -56,7 +42,7 @@ export const obtenerPorId = async (req: Request, res: Response): Promise<void> =
     }
 };
 
-export const crear = async (req: Request, res: Response): Promise<void> => {
+export const crear = async (req: Request, res: Response) => {
     try {
         const sala = await crearSalaService(req.body as CrearSalaBody, req.user!.id);
         res.status(201).json({ success: true, data: sala });
@@ -65,7 +51,7 @@ export const crear = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-export const unirse = async (req: Request, res: Response): Promise<void> => {
+export const unirse = async (req: Request, res: Response) => {
     try {
         const resultado = await unirseSalaService(req.params.id as string, req.user!.id);
         res.status(200).json({ success: true, data: resultado });
@@ -74,7 +60,7 @@ export const unirse = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-export const salir = async (req: Request, res: Response): Promise<void> => {
+export const salir = async (req: Request, res: Response) => {
     try {
         const resultado = await leaveSalaService(req.params.id as string, req.user!.id);
         res.status(200).json({ success: true, data: resultado });
@@ -83,7 +69,7 @@ export const salir = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-export const cancelar = async (req: Request, res: Response): Promise<void> => {
+export const cancelar = async (req: Request, res: Response) => {
     try {
         const { motivoCancelacion } = req.body as EliminarSalaBody;
         const resultado = await cambiarEstadoSalaService(
@@ -97,7 +83,7 @@ export const cancelar = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-export const expulsarJugador = async (req: Request, res: Response): Promise<void> => {
+export const expulsarJugador = async (req: Request, res: Response) => {
     try {
         const resultado = await expulsarJugadorService(
             req.params.id as string,
@@ -110,7 +96,7 @@ export const expulsarJugador = async (req: Request, res: Response): Promise<void
     }
 };
 
-export const editar = async (req: Request, res: Response): Promise<void> => {
+export const editar = async (req: Request, res: Response) => {
     try {
         const salaActualizada = await editarSalaService(
             req.params.id as string,
@@ -123,7 +109,7 @@ export const editar = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-export const transferirOrganizador = async (req: Request, res: Response): Promise<void> => {
+export const transferirOrganizador = async (req: Request, res: Response) => {
     try {
         const { nuevoOrganizadorUserId } = req.body as TransferirOrganizadorBody;
         const resultado = await transferirOrganizadorService(
@@ -145,7 +131,21 @@ export const aceptarSolicitudController = async (req: Request, res: Response) =>
 
         const resultado = await aceptarSolicitudService(salaId, participacionId, organizadorId);
 
-        res.status(200).json({ success: true, data: resultado });
+        return res.status(200).json({ success: true, data: resultado });
+    } catch (error) {
+        responderError(res, error);
+    }
+};
+
+export const rechazarSolicitudController = async (req: Request, res: Response) => {
+    try {
+        const salaId = req.params.id as string;
+        const participacionId = req.params.participacionId as string;
+        const organizadorId = req.user!.id;
+
+        const resultado = await rechazarSolicitudService(salaId, participacionId, organizadorId);
+
+        return res.status(200).json({ success: true, data: resultado });
     } catch (error) {
         responderError(res, error);
     }

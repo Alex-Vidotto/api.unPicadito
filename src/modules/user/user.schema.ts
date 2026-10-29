@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { POSICION_CANCHA } from "../../constants/type";
+
+const POSICIONES_VALIDAS = Object.values(POSICION_CANCHA) as [string, ...string[]];
 
 export const registerSchema = z.object({
     nombre: z.string().trim().min(1, "First name is required"),
@@ -11,7 +14,7 @@ export const registerSchema = z.object({
     fotoPerfilUrl: z.string().trim().url("Must be a valid URL").optional(),
 }).refine((data) => data.password === data.passwordConfirm, {
     message: "Passwords do not match",
-    path: ["passwordConfirm"], // El error aparecerá específicamente en este campo
+    path: ["passwordConfirm"],
 });
 
 export const loginSchema = z.object({
@@ -20,7 +23,18 @@ export const loginSchema = z.object({
     password: z.string().min(1, "Password is required"),
 }).refine((data) => !!(data.email || data.nombreUsuario), {
     message: "Email or username is required",
-    path: ["email"], // Si falta, el error lo marcará acá
+    path: ["email"],
+});
+
+export const userIdParamSchema = z.object({
+    id: z.coerce.number().int().positive("El ID del jugador debe ser un número válido"),
+});
+
+export const searchUserQuerySchema = z.object({
+    term: z.string().trim().optional(),
+    q: z.string().trim().optional(),
+    limite: z.coerce.number().int().positive().max(100).default(12),
+    pagina: z.coerce.number().int().positive().default(1),
 });
 
 export const updateProfileSchema = z.object({
@@ -30,14 +44,7 @@ export const updateProfileSchema = z.object({
     apellido: z.string().trim().min(1).max(100).optional(),
     apodo: z.string().trim().max(100).optional(),
     fotoPerfilUrl: z.string().trim().url("Ingresá una URL válida").max(255).nullable().optional(),
-    posicionPrincipal: z.enum([
-        "ARQUERO",
-        "DEFENSOR",
-        "MEDIOCAMPISTA",
-        "DELANTERO",
-        "TODOTERRENO",
-        "POLIFUNCIONAL",
-    ]).optional(),
+    posicionPrincipal: z.enum(POSICIONES_VALIDAS).optional(),
     currentPassword: z.string().optional(),
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").optional(),
     passwordConfirm: z.string().optional(),
@@ -82,3 +89,8 @@ export const updateProfileSchema = z.object({
         }
     }
 });
+
+export type RegisterDto = z.infer<typeof registerSchema>;
+export type LoginDto = z.infer<typeof loginSchema>;
+export type UpdateProfileDto = z.infer<typeof updateProfileSchema>;
+export type UserIdParam = z.infer<typeof userIdParamSchema>;

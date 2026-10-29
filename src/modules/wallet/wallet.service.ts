@@ -39,11 +39,11 @@ export class WalletService {
 
       const movement = manager.create(WalletMovement, {
         userId: user.id,
-        matchId,
+        matchId: Number(matchId) || 0,
         idempotencyKey,
         montoReservado: descuentoAplicado,
         status,
-      });
+      } as any);
 
       await manager.save(movement);
     }

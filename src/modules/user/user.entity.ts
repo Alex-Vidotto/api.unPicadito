@@ -22,7 +22,7 @@ export class User {
   @Column({ type: "varchar", length: 100, unique: true })
   email!: string;
 
-  @Column({ type: "varchar", length: 100, nullable: false, select: true })
+  @Column({ type: "varchar", length: 100, nullable: false, select: false })
   passwordHash!: string;
 
   @Column({ type: "varchar", length: 50, unique: true })
@@ -81,4 +81,4 @@ export class User {
     default: 0.0,
   })
   saldoCredito: number;
-} 
+}

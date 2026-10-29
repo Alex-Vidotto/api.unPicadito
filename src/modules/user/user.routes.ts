@@ -1,26 +1,16 @@
-import { Router } from 'express';
+import { Router } from "express";
 import * as userController from "./user.controller";
-import { validateMiddleware } from '../../middlewares/validate.middleware';
-import { registerSchema, loginSchema, updateProfileSchema } from './user.schema';
-import { authenticateJWT } from "../../middlewares/auth.middleware"; 
+import { validateMiddleware } from "../../middlewares/validate.middleware";
+import { registerSchema, loginSchema, userIdParamSchema, searchUserQuerySchema, updateProfileSchema } from "./user.schema";
+import { authenticateJWT } from "../../middlewares/auth.middleware";
 
-const router = Router();    
+const router = Router();
 
-// POST /api/users/register
-router.post("/register", validateMiddleware(registerSchema), userController.register);
-
-// POST /api/users/login
-router.post("/login", validateMiddleware(loginSchema), userController.login);
-
-//GET /api/users
-// en frontend: fetch('/api/users?nombre=manuComandante')
-router.get("/", userController.searchPlayers);
-
-// Mi perfil privado
+router.post("/register", validateMiddleware(registerSchema, "body"), userController.register);
+router.post("/login", validateMiddleware(loginSchema, "body"), userController.login);
+router.get("/", validateMiddleware(searchUserQuerySchema, "query"), userController.searchPlayers);
 router.get("/me", authenticateJWT, userController.getUserProfile);
-
-router.patch("/me", authenticateJWT, validateMiddleware(updateProfileSchema), userController.updateProfile);
-
-router.get("/:id", userController.getPublicProfile);
+router.patch("/me", authenticateJWT, validateMiddleware(updateProfileSchema, "body"), userController.updateProfile);
+router.get("/:id", validateMiddleware(userIdParamSchema, "params"), userController.getPublicProfile);
 
 export default router;

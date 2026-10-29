@@ -5,11 +5,7 @@ export const validateMiddleware = (
     schema: ZodSchema,
     target: "body" | "query" | "params" = "body",
 ) => {
-    return async (
-        req: Request,
-        res: Response,
-        next: NextFunction,
-    ): Promise<void> => {
+    return async (req: Request, res: Response, next: NextFunction) => {
         try {
             const parsed = await schema.parseAsync(req[target]);
             if (target === "query") {
@@ -19,22 +15,17 @@ export const validateMiddleware = (
             }
             next();
         } catch (error: any) {
-            console.error(
-                "🔴 Error capturado en validación:",
-                error?.name,
-                error?.message,
-            );
+            console.error("🔴 Error capturado en validación:", error?.name, error?.message);
             if (error instanceof ZodError || error?.name === "ZodError") {
-                res.status(400).json({
+                return res.status(400).json({
                     message: "Error de validación",
                     errors: error.issues.map((err: any) => ({
                         field: err.path.join("."),
                         message: err.message,
                     })),
                 });
-                return;
             }
-            res.status(500).json({ message: "Error interno de validación" });
+            return res.status(500).json({ message: "Error interno de validación" });
         }
     };
 };

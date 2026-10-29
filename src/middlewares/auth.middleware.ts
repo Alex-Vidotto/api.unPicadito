@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-// Extendemos la interfaz Request de Express para reconozca req.user
 declare global {
   namespace Express {
     interface Request {
@@ -19,12 +18,20 @@ export const authenticateJWT = (req: Request, res: Response, next: NextFunction)
     return res.status(401).json({ message: 'Token no provisto o formato inválido' });
   }
 
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    return res.status(500).json({ message: 'JWT_SECRET no configurado en el servidor' });
+  }
+
   const token = authHeader.split(' ')[1];
 
   try {
-    // Reemplaza 'TU_CLAVE_SECRETA' por process.env.JWT_SECRET o tu clave actual
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "mi_secreto_unico_compartido") as { id: number };
+    const decoded = jwt.verify(token, secret) as any;
     
+    if (!decoded || typeof decoded.id !== 'number') {
+      return res.status(403).json({ message: 'Token inválido: payload malformado' });
+    }
+
     // Inyectamos el usuario en la request
     req.user = { id: decoded.id };
     
