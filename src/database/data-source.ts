@@ -8,6 +8,8 @@ import { FriendshipEntity } from "../modules/friendship/friendship.entity.js";
 import { ParticipacionSala } from "../modules/participacionSala/participacionSala.entity.js";
 import { Message } from "../modules/messages/message.entity.js";
 import { WalletMovement } from "../modules/wallet/wallet.entity.js";
+import { Predio } from "../modules/predio/predio.entity.js";
+import { Cancha } from "../modules/predio/cancha.entity.js";
 
 export const AppDataSource = new DataSource({
     type: "mysql",
@@ -17,5 +19,5 @@ export const AppDataSource = new DataSource({
     password: process.env.DB_PASS || "",
     database: process.env.DB_NAME || "picadito_db",
     synchronize: true,
-    entities: [User, FriendshipEntity, Sala, ParticipacionSala, Review, Message, WalletMovement],
+    entities: [User, FriendshipEntity, Sala, ParticipacionSala, Review, Message, WalletMovement, Predio, Cancha],
 });
