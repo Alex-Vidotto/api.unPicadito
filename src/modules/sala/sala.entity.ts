@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, Index, BeforeInsert } from "typeorm";
 import { User } from '../user/user.entity';
 import { ParticipacionSala } from '../participacionSala/participacionSala.entity';
+import { Cancha } from '../predio/cancha.entity';
 import { EstadoSala } from '../../constants/type';
 import crypto from "crypto";
 
@@ -67,6 +68,10 @@ export class Sala {
     @ManyToOne(() => User, (user) => user.salasCreadas, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'creador_id' })
     creador: User;
+
+    @ManyToOne(() => Cancha, (cancha) => cancha.salas, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'cancha_id' })
+    cancha: Cancha;
 
     cuposOcupados?: number;
     unidoPorUsuarioActual?: number;

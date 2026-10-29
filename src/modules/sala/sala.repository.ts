@@ -2,13 +2,17 @@ import { AppDataSource } from "../../database/data-source";
 import type { EntityManager } from "typeorm";
 import { Sala } from "./sala.entity";
 import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
-import { BuscarSalasQuery, CrearSalaBody } from "./sala.schema";
+import { BuscarSalasQuery } from "./sala.schema";
 import { EstadoParticipacion, RolEnSala, EstadoSala, OrigenIngreso, ESTADO_PARTICIPACION, ESTADO_SALA, ROL_EN_SALA } from "../../constants/type";
 
 export const baseSalaRepo = AppDataSource.getRepository(Sala);
 export const baseParticipacionSalaRepo = AppDataSource.getRepository(ParticipacionSala);
 
 const escaparLike = (valor: string) => valor.replace(/[\\%_]/g, "\\$&");
+
+export const ejecutarTransaccion = async <T>(cb: (manager: EntityManager) => Promise<T>): Promise<T> => {
+    return await AppDataSource.transaction(cb);
+};
 
 export const buscarSalasConFiltros = async (
     filtros: BuscarSalasQuery,
@@ -23,6 +27,8 @@ export const buscarSalasConFiltros = async (
 
     const query = baseSalaRepo.createQueryBuilder("sala")
         .leftJoinAndSelect("sala.creador", "creador")
+        .leftJoinAndSelect("sala.cancha", "cancha")
+        .leftJoinAndSelect("cancha.predio", "predio")
         .leftJoin("sala.participantes", "participacion", "participacion.estado = :confirmado", { confirmado: ESTADO_PARTICIPACION.CONFIRMADO })
         .where("sala.estado IN (:...estados)", { estados: [ESTADO_SALA.ABIERTA, ESTADO_SALA.COMPLETA] });
 
@@ -62,7 +68,7 @@ export const buscarSalasConFiltros = async (
     }
 
     query.addSelect("COUNT(DISTINCT participacion.id)", "cuposOcupados");
-    query.groupBy("sala.id").addGroupBy("creador.id");
+    query.groupBy("sala.id").addGroupBy("creador.id").addGroupBy("cancha.id").addGroupBy("predio.id");
 
     if (estadoDisponibilidad === "DISPONIBLES") {
         query.having("COUNT(DISTINCT participacion.id) < sala.cuposTotales");
@@ -123,22 +129,46 @@ export const buscarSalasConFiltros = async (
     };
 };
 
-export const crearNuevaSala = async (data: CrearSalaBody, userId: number, manager?: any) => {
-    const { ubicacion, ...restoData } = data;
+export const crearNuevaSala = async (data: any, userId: number, manager?: EntityManager) => {
+    const { ubicacion, canchaId, ...restoData } = data;
     const repositorio = manager ? manager.getRepository(Sala) : baseSalaRepo;
     const sala = repositorio.create({
         ...restoData,
+        cancha: { id: canchaId },
         creador: { id: userId },
         ubicacion: `POINT(${ubicacion.x} ${ubicacion.y})` as any,
-    });
+    } as Partial<Sala>);
     return await repositorio.save(sala);
 };
 
 export const obtenerSalaConParticipantes = async (salaId: string) => {
     return await baseSalaRepo.findOne({
         where: { id: salaId },
-        relations: { creador: true, participantes: { usuario: true } },
+        relations: { creador: true, cancha: { predio: true }, participantes: { usuario: true } },
     });
+};
+
+export const obtenerSalaConBloqueo = async (
+    salaId: string,
+    manager: EntityManager,
+    conParticipantes: boolean = false
+) => {
+    const qb = manager.createQueryBuilder(Sala, "sala");
+    if (conParticipantes) {
+        qb.leftJoinAndSelect("sala.participantes", "participacion")
+          .leftJoinAndSelect("participacion.usuario", "usuario");
+    }
+    return await qb.setLock("pessimistic_write").where("sala.id = :salaId", { salaId }).getOne();
+};
+
+export const obtenerSalaSimple = async (salaId: string, manager?: EntityManager) => {
+    const repositorio = manager ? manager.getRepository(Sala) : baseSalaRepo;
+    return await repositorio.findOne({ where: { id: salaId } });
+};
+
+export const actualizarSala = async (salaId: string, datos: Partial<Sala>, manager?: EntityManager) => {
+    const repositorio = manager ? manager.getRepository(Sala) : baseSalaRepo;
+    return await repositorio.update(salaId, datos);
 };
 
 export const crearParticipacionEnSala = async (
@@ -149,7 +179,7 @@ export const crearParticipacionEnSala = async (
         rol: RolEnSala;
         origenIngreso: OrigenIngreso;
     },
-    manager?: any
+    manager?: EntityManager
 ) => {
     const repositorio = manager ? manager.getRepository(ParticipacionSala) : baseParticipacionSalaRepo;
     const participacion = repositorio.create({
@@ -160,8 +190,15 @@ export const crearParticipacionEnSala = async (
     return await repositorio.save(participacion);
 };
 
-export const contarParticipantesConfirmados = async (salaId: string) => {
-    return await baseParticipacionSalaRepo.count({
+export const guardarNuevaParticipacion = async (datos: any, manager?: EntityManager) => {
+    const repositorio = manager ? manager.getRepository(ParticipacionSala) : baseParticipacionSalaRepo;
+    const participacion = repositorio.create(datos);
+    return await repositorio.save(participacion);
+};
+
+export const contarParticipantesConfirmados = async (salaId: string, manager?: EntityManager) => {
+    const repositorio = manager ? manager.getRepository(ParticipacionSala) : baseParticipacionSalaRepo;
+    return await repositorio.count({
         where: { sala: { id: salaId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
     });
 };
@@ -170,8 +207,9 @@ export const actualizarEstadoSalaEnBD = async (salaId: string, estado: EstadoSal
     return await baseSalaRepo.update(salaId, { estado });
 };
 
-export const esOrganizadorDeSala = async (salaId: string, userId: number) => {
-    const count = await baseParticipacionSalaRepo.count({
+export const esOrganizadorDeSala = async (salaId: string, userId: number, manager?: EntityManager) => {
+    const repositorio = manager ? manager.getRepository(ParticipacionSala) : baseParticipacionSalaRepo;
+    const count = await repositorio.count({
         where: {
             sala: { id: salaId },
             usuario: { id: userId },
@@ -182,10 +220,20 @@ export const esOrganizadorDeSala = async (salaId: string, userId: number) => {
     return count > 0;
 };
 
+export const verificarEsOrganizador = esOrganizadorDeSala;
+
 export const obtenerParticipacionPorId = async (participacionId: string) => {
     return await baseParticipacionSalaRepo.findOne({
         where: { id: participacionId },
         relations: { usuario: true, sala: true },
+    });
+};
+
+export const obtenerParticipacion = async (criterios: any, manager?: EntityManager, relations?: any) => {
+    const repositorio = manager ? manager.getRepository(ParticipacionSala) : baseParticipacionSalaRepo;
+    return await repositorio.findOne({
+        where: criterios,
+        relations,
     });
 };
 
@@ -199,7 +247,19 @@ export const actualizarEstadoYRolParticipacion = async (
     return await repositorio.update(participacionId, { rol, estado });
 };
 
-export const actualizarEstadoYRolPArticipacion = actualizarEstadoYRolParticipacion;
+export const actualizarParticipacion = async (
+    participacionId: string,
+    datos: any,
+    manager?: EntityManager
+) => {
+    const repositorio = manager ? manager.getRepository(ParticipacionSala) : baseParticipacionSalaRepo;
+    return await repositorio.update(participacionId, datos);
+};
+
+export const eliminarParticipacion = async (participacionId: string, manager?: EntityManager) => {
+    const repositorio = manager ? manager.getRepository(ParticipacionSala) : baseParticipacionSalaRepo;
+    return await repositorio.delete(participacionId);
+};
 
 export const finalizarSalasVencidasEnBD = async (limite: Date, salaId?: string): Promise<number> => {
     const query = baseSalaRepo

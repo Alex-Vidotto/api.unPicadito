@@ -21,7 +21,6 @@ import {
     rechazarSolicitudService,
     finalizarSalaService
 } from "./sala.service";
-
 const responderError = (res: Response, error: unknown) => {
     if (
         typeof error === "object" &&
@@ -38,6 +37,7 @@ const responderError = (res: Response, error: unknown) => {
     console.error(error);
     res.status(500).json({ success: false, message: "Error interno del servidor" });
 };
+
 
 export const buscar = async (req: Request, res: Response) => {
     try {

@@ -52,3 +52,18 @@ export const ORIGEN_INGRESO = {
     SOLICITUD_DIRECTA: 'SOLICITUD_DIRECTA',
 } as const;
 export type OrigenIngreso = typeof ORIGEN_INGRESO[keyof typeof ORIGEN_INGRESO];
+
+export const TIPO_FUTBOL = {
+    FUTBOL_5: 'FUTBOL_5',
+    FUTBOL_7: 'FUTBOL_7',
+    FUTBOL_8: 'FUTBOL_8',
+    FUTBOL_11: 'FUTBOL_11',
+} as const;
+export type TipoFutbol = typeof TIPO_FUTBOL[keyof typeof TIPO_FUTBOL];
+
+export const TIPO_SUPERFICIE = {
+    SINTETICO: 'SINTETICO',
+    CESPED_NATURAL: 'CESPED_NATURAL',
+    PARQUET: 'PARQUET',
+} as const;
+export type TipoSuperficie = typeof TIPO_SUPERFICIE[keyof typeof TIPO_SUPERFICIE];

@@ -3,20 +3,28 @@ import {
     crearNuevaSala,
     obtenerSalaConParticipantes,
     crearParticipacionEnSala,
-    actualizarEstadoYRolParticipacion,
-    baseParticipacionSalaRepo,
-    finalizarSalasVencidasEnBD
+    finalizarSalasVencidasEnBD,
+    ejecutarTransaccion,
+    obtenerSalaConBloqueo,
+    obtenerSalaSimple,
+    actualizarSala,
+    verificarEsOrganizador,
+    contarParticipantesConfirmados,
+    obtenerParticipacion,
+    eliminarParticipacion,
+    guardarNuevaParticipacion,
+    actualizarParticipacion,
+    actualizarEstadoYRolParticipacion
 } from "./sala.repository";
 import { BuscarSalasQuery, CrearSalaBody, EditarSalaBody } from "./sala.schema";
-import { Sala } from "./sala.entity";
-import { AppDataSource } from "../../database/data-source";
-import { ParticipacionSala } from "../participacionSala/participacionSala.entity";
+import { obtenerCanchaConPredioService } from "../predio/predio.service";
 import { EstadoSala, ESTADO_SALA, ROL_EN_SALA, ESTADO_PARTICIPACION, ORIGEN_INGRESO } from "../../constants/type";
 
 const ESTADOS_CERRADOS: EstadoSala[] = [ESTADO_SALA.CANCELADA, ESTADO_SALA.FINALIZADA];
 const DURACION_PARTIDO_POR_DEFECTO_MINUTOS = 60;
 const MILISEGUNDOS_POR_MINUTO = 60000;
 const MINUTOS_PARA_FINALIZAR = 30;
+
 const errorHttp = (status: number, mensaje: string) => Object.assign(new Error(mensaje), { status });
 
 export const buscarSalas = (filtros: BuscarSalasQuery, userId: number) => {
@@ -34,23 +42,41 @@ export const obtenerDetalleSalaService = async (salaId: string) => {
 };
 
 export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
-    const participacionesUsuario = await baseParticipacionSalaRepo.find({
-        where: { usuario: { id: userId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
-        relations: { sala: true },
-    });
+    let dataFinal = { ...data };
 
-    const inicioNuevo = new Date(data.fechaHoraPartido);
-    const duracion = data.duracionMinutos || DURACION_PARTIDO_POR_DEFECTO_MINUTOS;
-    const finNuevo = new Date(inicioNuevo.getTime() + duracion * MILISEGUNDOS_POR_MINUTO);
+    if (data.canchaId) {
+        const cancha = await obtenerCanchaConPredioService(data.canchaId);
+        dataFinal.nombreCancha = cancha.nombre;
+        dataFinal.direccion = cancha.predio?.direccion || data.direccion;
+        if (cancha.predio?.ubicacion) {
+            dataFinal.ubicacion = {
+                x: cancha.predio.ubicacion.x,
+                y: cancha.predio.ubicacion.y,
+            };
+        }
+    }
 
-    for (const part of participacionesUsuario) {
-        if (ESTADOS_CERRADOS.includes(part.sala.estado)) continue;
+    if (!dataFinal.ubicacion) {
+        throw errorHttp(400, "La ubicación de la cancha es obligatoria");
+    }
 
-        const inicioExistente = new Date(part.sala.fechaHoraPartido);
-        const duracionExistente = part.sala.duracionMinutos || DURACION_PARTIDO_POR_DEFECTO_MINUTOS;
-        const finExistente = new Date(inicioExistente.getTime() + duracionExistente * MILISEGUNDOS_POR_MINUTO);
+    const fechaInicioNuevo = new Date(data.fechaHoraPartido);
+    const fechaFinNuevo = new Date(
+        fechaInicioNuevo.getTime() + DURACION_PARTIDO_POR_DEFECTO_MINUTOS * MILISEGUNDOS_POR_MINUTO
+    );
 
-        if (inicioNuevo < finExistente && finNuevo > inicioExistente) {
+    const misSalas = await buscarSalasConFiltros({ misSalas: true } as any, [], userId);
+
+    for (const salaExistente of misSalas.salas) {
+        const fechaInicioExistente = new Date(salaExistente.fechaHoraPartido);
+        const fechaFinExistente = new Date(
+            fechaInicioExistente.getTime() + DURACION_PARTIDO_POR_DEFECTO_MINUTOS * MILISEGUNDOS_POR_MINUTO
+        );
+
+        const haySolapamiento =
+            fechaInicioNuevo < fechaFinExistente && fechaFinNuevo > fechaInicioExistente;
+
+        if (haySolapamiento) {
             throw errorHttp(
                 409,
                 "No podés crear este partido porque ya participás en otra sala en ese horario."
@@ -58,8 +84,8 @@ export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
         }
     }
 
-    return await AppDataSource.transaction(async (manager) => {
-        const sala = await crearNuevaSala(data, userId, manager);
+    return await ejecutarTransaccion(async (manager) => {
+        const sala = await crearNuevaSala(dataFinal, userId, manager);
 
         await crearParticipacionEnSala(
             sala.id,
@@ -77,22 +103,11 @@ export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
 };
 
 export const editarSalaService = async (salaId: string, userId: number, datos: EditarSalaBody) => {
-    return await AppDataSource.transaction(async (manager) => {
-        const sala = await manager.createQueryBuilder(Sala, "sala")
-            .setLock("pessimistic_write")
-            .where("sala.id = :salaId", { salaId })
-            .getOne();
-
+    return await ejecutarTransaccion(async (manager) => {
+        const sala = await obtenerSalaConBloqueo(salaId, manager);
         if (!sala) throw errorHttp(404, "Sala no encontrada");
 
-        const esOrganizador = await manager.count(ParticipacionSala, {
-            where: {
-                sala: { id: salaId },
-                usuario: { id: userId },
-                rol: ROL_EN_SALA.ORGANIZADOR,
-                estado: ESTADO_PARTICIPACION.CONFIRMADO,
-            },
-        });
+        const esOrganizador = await verificarEsOrganizador(salaId, userId, manager);
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede editarla");
 
         if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
@@ -118,16 +133,14 @@ export const editarSalaService = async (salaId: string, userId: number, datos: E
             throw errorHttp(400, "No se pueden modificar fecha u ubicación a menos de 24 horas del partido");
         }
 
-        const datosActualizados: Partial<Sala> = { ...datos };
+        const datosActualizados: any = { ...datos };
 
         if (datos.ubicacion) {
-            datosActualizados.ubicacion = `POINT(${datos.ubicacion.x} ${datos.ubicacion.y})` as any;
+            datosActualizados.ubicacion = `POINT(${datos.ubicacion.x} ${datos.ubicacion.y})`;
         }
 
         if (datos.cuposTotales !== undefined) {
-            const participantesConfirmados = await manager.count(ParticipacionSala, {
-                where: { sala: { id: salaId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
-            });
+            const participantesConfirmados = await contarParticipantesConfirmados(salaId, manager);
 
             if (datos.cuposTotales < participantesConfirmados) {
                 throw errorHttp(409, "Los cupos totales no pueden ser menores que los participantes confirmados");
@@ -136,9 +149,9 @@ export const editarSalaService = async (salaId: string, userId: number, datos: E
             datosActualizados.estado = participantesConfirmados >= datos.cuposTotales ? ESTADO_SALA.COMPLETA : ESTADO_SALA.ABIERTA;
         }
 
-        await manager.update(Sala, salaId, datosActualizados);
+        await actualizarSala(salaId, datosActualizados, manager);
 
-        const salaActualizada = await manager.findOne(Sala, { where: { id: salaId } });
+        const salaActualizada = await obtenerSalaSimple(salaId, manager);
         if (!salaActualizada) throw errorHttp(404, "Sala no encontrada");
 
         return salaActualizada;
@@ -146,39 +159,22 @@ export const editarSalaService = async (salaId: string, userId: number, datos: E
 };
 
 export const cambiarEstadoSalaService = async (salaId: string, userId: number, motivo: string) => {
-    return await AppDataSource.transaction(async (manager) => {
-        const sala = await manager.createQueryBuilder(Sala, "sala")
-            .setLock("pessimistic_write")
-            .where("sala.id = :salaId", { salaId })
-            .getOne();
-
+    return await ejecutarTransaccion(async (manager) => {
+        const sala = await obtenerSalaConBloqueo(salaId, manager);
         if (!sala) throw errorHttp(404, "Sala no encontrada");
         if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
 
-        const esOrganizador = await manager.count(ParticipacionSala, {
-            where: {
-                sala: { id: salaId },
-                usuario: { id: userId },
-                rol: ROL_EN_SALA.ORGANIZADOR,
-                estado: ESTADO_PARTICIPACION.CONFIRMADO,
-            },
-        });
+        const esOrganizador = await verificarEsOrganizador(salaId, userId, manager);
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede dar de baja");
 
-        await manager.update(Sala, salaId, { estado: ESTADO_SALA.CANCELADA, motivoCancelacion: motivo });
+        await actualizarSala(salaId, { estado: ESTADO_SALA.CANCELADA, motivoCancelacion: motivo }, manager);
         return { mensaje: "Sala cancelada correctamente" };
     });
 };
 
 export const leaveSalaService = async (salaId: string, userId: number) => {
-    return await AppDataSource.transaction(async (manager) => {
-        const sala = await manager.createQueryBuilder(Sala, "sala")
-            .leftJoinAndSelect("sala.participantes", "participacion")
-            .leftJoinAndSelect("participacion.usuario", "usuario")
-            .setLock("pessimistic_write")
-            .where("sala.id = :salaId", { salaId })
-            .getOne();
-
+    return await ejecutarTransaccion(async (manager) => {
+        const sala = await obtenerSalaConBloqueo(salaId, manager, true);
         if (!sala) throw errorHttp(404, "Sala no encontrada");
         if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
 
@@ -188,14 +184,12 @@ export const leaveSalaService = async (salaId: string, userId: number) => {
             throw errorHttp(409, "El organizador no puede salir de sala, debe transferir el rol o cancelarla.");
         }
 
-        await manager.delete(ParticipacionSala, participacion.id);
+        await eliminarParticipacion(participacion.id, manager);
 
         if (sala.estado === ESTADO_SALA.COMPLETA) {
-            const confirmados = await manager.count(ParticipacionSala, {
-                where: { sala: { id: salaId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
-            });
+            const confirmados = await contarParticipantesConfirmados(salaId, manager);
             if (confirmados < sala.cuposTotales) {
-                await manager.update(Sala, salaId, { estado: ESTADO_SALA.ABIERTA });
+                await actualizarSala(salaId, { estado: ESTADO_SALA.ABIERTA }, manager);
             }
         }
 
@@ -204,14 +198,8 @@ export const leaveSalaService = async (salaId: string, userId: number) => {
 };
 
 export const unirseSalaService = async (salaId: string, userId: number) => {
-    return await AppDataSource.transaction(async (manager) => {
-        const sala = await manager.createQueryBuilder(Sala, "sala")
-            .leftJoinAndSelect("sala.participantes", "participacion")
-            .leftJoinAndSelect("participacion.usuario", "usuario")
-            .setLock("pessimistic_write")
-            .where("sala.id = :salaId", { salaId })
-            .getOne();
-
+    return await ejecutarTransaccion(async (manager) => {
+        const sala = await obtenerSalaConBloqueo(salaId, manager, true);
         if (!sala) throw errorHttp(404, "Sala no encontrada");
         if (sala.estado !== ESTADO_SALA.ABIERTA && sala.estado !== ESTADO_SALA.COMPLETA) {
             throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
@@ -241,14 +229,13 @@ export const unirseSalaService = async (salaId: string, userId: number) => {
         }
 
         if (!sala.esPublica) {
-            const nuevaParticipacion = manager.create(ParticipacionSala, {
+            const participacion = await guardarNuevaParticipacion({
                 sala: { id: salaId },
                 usuario: { id: userId },
                 estado: ESTADO_PARTICIPACION.PENDIENTE,
                 rol: ROL_EN_SALA.SOLICITANTE,
                 origenIngreso: ORIGEN_INGRESO.SOLICITUD_DIRECTA,
-            });
-            const participacion = await manager.save(nuevaParticipacion);
+            }, manager);
 
             return {
                 mensaje: "Tu solicitud fue enviada y está pendiente de aprobación",
@@ -258,17 +245,16 @@ export const unirseSalaService = async (salaId: string, userId: number) => {
         }
 
         const rol = hayCupo ? ROL_EN_SALA.TITULAR : ROL_EN_SALA.SUPLENTE;
-        const nuevaParticipacion = manager.create(ParticipacionSala, {
+        const participacion = await guardarNuevaParticipacion({
             sala: { id: salaId },
             usuario: { id: userId },
             estado: ESTADO_PARTICIPACION.CONFIRMADO,
             rol,
             origenIngreso: ORIGEN_INGRESO.SOLICITUD_DIRECTA,
-        });
-        const participacion = await manager.save(nuevaParticipacion);
+        }, manager);
 
         if (rol === ROL_EN_SALA.TITULAR && confirmados + 1 >= sala.cuposTotales) {
-            await manager.update(Sala, salaId, { estado: ESTADO_SALA.COMPLETA });
+            await actualizarSala(salaId, { estado: ESTADO_SALA.COMPLETA }, manager);
         }
 
         return { mensaje: "Te uniste a la sala correctamente", rol, participacion };
@@ -276,25 +262,12 @@ export const unirseSalaService = async (salaId: string, userId: number) => {
 };
 
 export const expulsarJugadorService = async (salaId: string, userIdAExpulsar: number, organizadorId: number) => {
-    return await AppDataSource.transaction(async (manager) => {
-        const sala = await manager.createQueryBuilder(Sala, "sala")
-            .leftJoinAndSelect("sala.participantes", "participacion")
-            .leftJoinAndSelect("participacion.usuario", "usuario")
-            .setLock("pessimistic_write")
-            .where("sala.id = :salaId", { salaId })
-            .getOne();
-
+    return await ejecutarTransaccion(async (manager) => {
+        const sala = await obtenerSalaConBloqueo(salaId, manager, true);
         if (!sala) throw errorHttp(404, "Sala no encontrada");
         if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
 
-        const esOrganizador = await manager.count(ParticipacionSala, {
-            where: {
-                sala: { id: salaId },
-                usuario: { id: organizadorId },
-                rol: ROL_EN_SALA.ORGANIZADOR,
-                estado: ESTADO_PARTICIPACION.CONFIRMADO,
-            },
-        });
+        const esOrganizador = await verificarEsOrganizador(salaId, organizadorId, manager);
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede expulsar jugadores");
         if (userIdAExpulsar === organizadorId) {
             throw errorHttp(409, "No puedes expulsarte a ti mismo de esta forma. Debes cancelar la sala.");
@@ -303,14 +276,12 @@ export const expulsarJugadorService = async (salaId: string, userIdAExpulsar: nu
         const participacion = sala.participantes?.find((p) => p.usuario?.id === userIdAExpulsar);
         if (!participacion) throw errorHttp(404, "El jugador no está participando en esta sala");
 
-        await manager.delete(ParticipacionSala, participacion.id);
+        await eliminarParticipacion(participacion.id, manager);
 
         if (sala.estado === ESTADO_SALA.COMPLETA) {
-            const confirmados = await manager.count(ParticipacionSala, {
-                where: { sala: { id: salaId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
-            });
+            const confirmados = await contarParticipantesConfirmados(salaId, manager);
             if (confirmados < sala.cuposTotales) {
-                await manager.update(Sala, salaId, { estado: ESTADO_SALA.ABIERTA });
+                await actualizarSala(salaId, { estado: ESTADO_SALA.ABIERTA }, manager);
             }
         }
 
@@ -327,37 +298,29 @@ export const transferirOrganizadorService = async (
     userId: number,
     nuevoOrganizadorId: number,
 ) => {
-    return await AppDataSource.transaction(async (manager) => {
-        const sala = await manager.createQueryBuilder(Sala, "sala")
-            .setLock("pessimistic_write")
-            .where("sala.id = :salaId", { salaId })
-            .getOne();
-
+    return await ejecutarTransaccion(async (manager) => {
+        const sala = await obtenerSalaConBloqueo(salaId, manager);
         if (!sala) throw errorHttp(404, "Sala no encontrada");
         if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
         if (nuevoOrganizadorId === userId) throw errorHttp(409, "No puedes transferirte la organización a ti mismo");
 
-        const organizadorActual = await manager.findOne(ParticipacionSala, {
-            where: {
-                sala: { id: salaId },
-                usuario: { id: userId },
-                rol: ROL_EN_SALA.ORGANIZADOR,
-                estado: ESTADO_PARTICIPACION.CONFIRMADO,
-            },
-        });
+        const organizadorActual = await obtenerParticipacion({
+            sala: { id: salaId },
+            usuario: { id: userId },
+            rol: ROL_EN_SALA.ORGANIZADOR,
+            estado: ESTADO_PARTICIPACION.CONFIRMADO,
+        }, manager);
         if (!organizadorActual) throw errorHttp(403, "Solo el organizador de la sala puede transferir el rol");
 
-        const nuevoOrganizador = await manager.findOne(ParticipacionSala, {
-            where: {
-                sala: { id: salaId },
-                usuario: { id: nuevoOrganizadorId },
-                estado: ESTADO_PARTICIPACION.CONFIRMADO,
-            },
-        });
+        const nuevoOrganizador = await obtenerParticipacion({
+            sala: { id: salaId },
+            usuario: { id: nuevoOrganizadorId },
+            estado: ESTADO_PARTICIPACION.CONFIRMADO,
+        }, manager);
         if (!nuevoOrganizador) throw errorHttp(404, "El nuevo organizador debe ser un participante confirmado de la sala");
 
-        await manager.update(ParticipacionSala, organizadorActual.id, { rol: ROL_EN_SALA.TITULAR });
-        await manager.update(ParticipacionSala, nuevoOrganizador.id, { rol: ROL_EN_SALA.ORGANIZADOR });
+        await actualizarParticipacion(organizadorActual.id, { rol: ROL_EN_SALA.TITULAR }, manager);
+        await actualizarParticipacion(nuevoOrganizador.id, { rol: ROL_EN_SALA.ORGANIZADOR }, manager);
 
         return {
             message: "Organización transferida correctamente",
@@ -372,32 +335,18 @@ export const aceptarSolicitudService = async (
     participacionId: string,
     organizadorId: number,
 ) => {
-    return await AppDataSource.transaction(async (manager) => {
-        const sala = await manager.createQueryBuilder(Sala, "sala")
-            .setLock("pessimistic_write")
-            .where("sala.id = :salaId", { salaId })
-            .getOne();
-
+    return await ejecutarTransaccion(async (manager) => {
+        const sala = await obtenerSalaConBloqueo(salaId, manager);
         if (!sala) throw errorHttp(404, "Sala no encontrada");
         if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
 
-        const esOrganizador = await manager.count(ParticipacionSala, {
-            where: {
-                sala: { id: salaId },
-                usuario: { id: organizadorId },
-                rol: ROL_EN_SALA.ORGANIZADOR,
-                estado: ESTADO_PARTICIPACION.CONFIRMADO,
-            },
-        });
+        const esOrganizador = await verificarEsOrganizador(salaId, organizadorId, manager);
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede aceptar solicitudes");
 
-        const participacion = await manager.findOne(ParticipacionSala, {
-            where: { id: participacionId },
-            relations: { sala: true, usuario: true },
-        });
+        const participacion = await obtenerParticipacion({ id: participacionId }, manager, { sala: true, usuario: true });
 
         if (!participacion) throw errorHttp(404, "Participación no encontrada");
-        if (participacion.sala.id !== salaId) {
+        if (participacion.sala?.id !== salaId) {
             throw errorHttp(404, "La participación no corresponde a esta sala");
         }
         if (participacion.rol !== ROL_EN_SALA.SOLICITANTE) {
@@ -407,15 +356,12 @@ export const aceptarSolicitudService = async (
             throw errorHttp(409, "Esta solicitud ya fue procesada anteriormente");
         }
 
-        const confirmados = await manager.count(ParticipacionSala, {
-            where: { sala: { id: salaId }, estado: ESTADO_PARTICIPACION.CONFIRMADO },
-        });
+        const confirmados = await contarParticipantesConfirmados(salaId, manager);
 
         if (confirmados >= sala.cuposTotales) {
             throw errorHttp(409, "La sala está completa, no hay cupos titulares disponibles");
         }
 
-        // Aceptamos actualizando rol a TITULAR y estado a CONFIRMADO
         await actualizarEstadoYRolParticipacion(
             participacionId,
             ROL_EN_SALA.TITULAR,
@@ -424,7 +370,7 @@ export const aceptarSolicitudService = async (
         );
 
         if (confirmados + 1 >= sala.cuposTotales) {
-            await manager.update(Sala, salaId, { estado: ESTADO_SALA.COMPLETA });
+            await actualizarSala(salaId, { estado: ESTADO_SALA.COMPLETA }, manager);
         }
 
         return {
@@ -441,31 +387,21 @@ export const rechazarSolicitudService = async (
     participacionId: string,
     organizadorId: number,
 ) => {
-    return await AppDataSource.transaction(async (manager) => {
-        const esOrganizador = await manager.count(ParticipacionSala, {
-            where: {
-                sala: { id: salaId },
-                usuario: { id: organizadorId },
-                rol: ROL_EN_SALA.ORGANIZADOR,
-                estado: ESTADO_PARTICIPACION.CONFIRMADO,
-            },
-        });
+    return await ejecutarTransaccion(async (manager) => {
+        const esOrganizador = await verificarEsOrganizador(salaId, organizadorId, manager);
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede rechazar solicitudes");
 
-        const participacion = await manager.findOne(ParticipacionSala, {
-            where: { id: participacionId },
-            relations: { sala: true },
-        });
+        const participacion = await obtenerParticipacion({ id: participacionId }, manager, { sala: true });
 
         if (!participacion) throw errorHttp(404, "Participación no encontrada");
-        if (participacion.sala.id !== salaId) {
+        if (participacion.sala?.id !== salaId) {
             throw errorHttp(404, "La participación no corresponde a esta sala");
         }
         if (participacion.rol !== ROL_EN_SALA.SOLICITANTE) {
             throw errorHttp(409, "Esta participación no es una solicitud de ingreso");
         }
 
-        await manager.delete(ParticipacionSala, participacionId);
+        await eliminarParticipacion(participacionId, manager);
 
         return {
             mensaje: "Solicitud de ingreso rechazada correctamente",
@@ -475,22 +411,11 @@ export const rechazarSolicitudService = async (
 };
 
 export const finalizarSalaService = async (salaId: string, userId: number) => {
-    return AppDataSource.transaction(async (manager) => {
-        const sala = await manager.createQueryBuilder(Sala, "sala")
-            .setLock("pessimistic_write")
-            .where("sala.id = :salaId", { salaId })
-            .getOne();
-
+    return await ejecutarTransaccion(async (manager) => {
+        const sala = await obtenerSalaConBloqueo(salaId, manager);
         if (!sala) throw errorHttp(404, "Sala no encontrada");
 
-        const esOrganizador = await manager.count(ParticipacionSala, {
-            where: {
-                sala: { id: salaId },
-                usuario: { id: userId },
-                rol: ROL_EN_SALA.ORGANIZADOR,
-                estado: ESTADO_PARTICIPACION.CONFIRMADO,
-            },
-        });
+        const esOrganizador = await verificarEsOrganizador(salaId, userId, manager);
         if (!esOrganizador) throw errorHttp(403, "Solo el organizador de la sala puede finalizarla");
 
         if (ESTADOS_CERRADOS.includes(sala.estado)) throw errorHttp(409, `La sala se encuentra ${sala.estado}`);
@@ -504,7 +429,7 @@ export const finalizarSalaService = async (salaId: string, userId: number) => {
             );
         }
 
-        await manager.update(Sala, salaId, { estado: ESTADO_SALA.FINALIZADA });
+        await actualizarSala(salaId, { estado: ESTADO_SALA.FINALIZADA }, manager);
 
         return { salaId, estado: ESTADO_SALA.FINALIZADA, mensaje: "Sala finalizada correctamente" };
     });

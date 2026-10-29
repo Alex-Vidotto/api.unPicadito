@@ -6,6 +6,7 @@ import reviewRoutes from "./modules/review/review.routes";
 import userRoutes from "./modules/user/user.routes";
 import friendshipRoutes from "./modules/friendship/friendship.routes";
 import salaRoutes from "./modules/sala/sala.routes";
+import predioRoutes from "./modules/predio/predio.routes";
 import { walletRoutes } from "./modules/wallet/wallet.routes";
 import { AppDataSource } from "./database/data-source";
 import { authenticateJWT } from "./middlewares/auth.middleware";
@@ -23,6 +24,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/friendships", authenticateJWT, friendshipRoutes);
 app.use("/api/salas", authenticateJWT, salaRoutes);
+app.use("/api/predios", authenticateJWT, predioRoutes);
 app.use("/api/wallet", walletRoutes);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -37,10 +39,10 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 AppDataSource.initialize()
   .then(() => {
     console.log("Base de datos conectada");
+    iniciarSchedulerSalas();
     app.listen(process.env.PORT || 8080, () => {
       console.log(`Servidor en puerto ${process.env.PORT || 8080}`);
     });
-    iniciarSchedulerSalas();
   })
   .catch((err: Error) => {
     console.error("Error al conectar:", err);

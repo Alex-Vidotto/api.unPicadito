@@ -28,6 +28,7 @@ export const buscarSalasQuerySchema = z.object({
 export const crearSalaBodySchema = z.object({
     nombre: z.string().min(3).max(50),
     descripcion: z.string().optional(),
+    canchaId: z.coerce.number().int().positive("Debe seleccionar una cancha válida"),
     nombreCancha: z.string().min(3).max(50).optional().or(z.literal("")),
     direccion: z.string().min(5).max(100).optional().or(z.literal("")),
     fechaHoraPartido: z.coerce.date().refine((fecha) => {
@@ -39,14 +40,14 @@ export const crearSalaBodySchema = z.object({
         message: "La fecha debe ser futura y la hora debe ser en punto (ej: 14:00, 15:00)",
     }),
     duracionMinutos: z.number().int().positive().default(60),
-    cuposTotales: z.number().int().positive().default(10),
+    cuposTotales: z.coerce.number().int().positive().optional(),
     permiteSuplentes: booleanQuery.optional(),
     cuposSuplentesMax: z.number().int().min(0).default(4),
     esPublica: booleanQuery.optional(),
     ubicacion: z.object({
         x: z.number().finite().min(-180).max(180),
         y: z.number().finite().min(-90).max(90),
-    }),
+    }).optional(),
 });
 
 export const editarSalaBodySchema = z.object({
