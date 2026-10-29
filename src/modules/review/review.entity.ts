@@ -1,8 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Unique } from 'typeorm';
 import { User } from '../user/user.entity';
 import { Sala } from '../sala/sala.entity';
 
+
 @Entity('reviews')
+@Unique(['calificador', 'calificado', 'sala'])
 export class Review {
     @PrimaryGeneratedColumn('uuid')
     id: string;
