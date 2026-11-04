@@ -1,5 +1,6 @@
 import {
     buscarSalasConFiltros,
+    verificarSolapamientoHorario,
     crearNuevaSala,
     obtenerSalaConParticipantes,
     crearParticipacionEnSala,
@@ -42,50 +43,36 @@ export const obtenerDetalleSalaService = async (salaId: string) => {
 };
 
 export const crearSalaService = async (data: CrearSalaBody, userId: number) => {
-    let dataFinal = { ...data };
+    const cancha = await obtenerCanchaConPredioService(data.canchaId);
+    const ubicacion = cancha.predio?.ubicacion ?? data.ubicacion;
 
-    if (data.canchaId) {
-        const cancha = await obtenerCanchaConPredioService(data.canchaId);
-        dataFinal.nombreCancha = cancha.nombre;
-        dataFinal.direccion = cancha.predio?.direccion || data.direccion;
-        if (cancha.predio?.ubicacion) {
-            dataFinal.ubicacion = {
-                x: cancha.predio.ubicacion.x,
-                y: cancha.predio.ubicacion.y,
-            };
-        }
-    }
-
-    if (!dataFinal.ubicacion) {
+    if (!ubicacion) {
         throw errorHttp(400, "La ubicación de la cancha es obligatoria");
     }
 
-    const fechaInicioNuevo = new Date(data.fechaHoraPartido);
-    const fechaFinNuevo = new Date(
-        fechaInicioNuevo.getTime() + DURACION_PARTIDO_POR_DEFECTO_MINUTOS * MILISEGUNDOS_POR_MINUTO
-    );
+    const duracionMinutos = data.duracionMinutos ?? DURACION_PARTIDO_POR_DEFECTO_MINUTOS;
+    const fechaInicio = new Date(data.fechaHoraPartido);
+    const fechaFin = new Date(fechaInicio.getTime() + duracionMinutos * MILISEGUNDOS_POR_MINUTO);
 
-    const misSalas = await buscarSalasConFiltros({ misSalas: true, pagina: 1, limite: 100 } as any, [], userId);
-
-    for (const salaExistente of misSalas.salas) {
-        const fechaInicioExistente = new Date(salaExistente.fechaHoraPartido);
-        const fechaFinExistente = new Date(
-            fechaInicioExistente.getTime() + DURACION_PARTIDO_POR_DEFECTO_MINUTOS * MILISEGUNDOS_POR_MINUTO
+    const haySolapamiento = await verificarSolapamientoHorario(userId, fechaInicio, fechaFin);
+    if (haySolapamiento) {
+        throw errorHttp(
+            409,
+            "No podés crear este partido porque ya participás en otra sala en ese horario."
         );
-
-        const haySolapamiento =
-            fechaInicioNuevo < fechaFinExistente && fechaFinNuevo > fechaInicioExistente;
-
-        if (haySolapamiento) {
-            throw errorHttp(
-                409,
-                "No podés crear este partido porque ya participás en otra sala en ese horario."
-            );
-        }
     }
 
     return await ejecutarTransaccion(async (manager) => {
-        const sala = await crearNuevaSala(dataFinal, userId, manager);
+        const sala = await crearNuevaSala(
+            {
+                ...data,
+                nombreCancha: cancha.nombre,
+                direccion: cancha.predio?.direccion || data.direccion,
+                ubicacion,
+            },
+            userId,
+            manager
+        );
 
         await crearParticipacionEnSala(
             sala.id,
@@ -134,10 +121,6 @@ export const editarSalaService = async (salaId: string, userId: number, datos: E
         }
 
         const datosActualizados: any = { ...datos };
-
-        if (datos.ubicacion) {
-            datosActualizados.ubicacion = `POINT(${datos.ubicacion.x} ${datos.ubicacion.y})`;
-        }
 
         if (datos.cuposTotales !== undefined) {
             const participantesConfirmados = await contarParticipantesConfirmados(salaId, manager);

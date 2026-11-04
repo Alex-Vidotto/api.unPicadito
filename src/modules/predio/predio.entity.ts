@@ -16,7 +16,7 @@ export class Predio {
     localidad: string;
 
     @Column({ type: "point", srid: 4326 })
-    ubicacion: { x: number; y: number };
+    ubicacion: { x: number; y: number } | string;
 
     @Column({ type: "varchar", length: 30, nullable: true })
     telefono: string | null;

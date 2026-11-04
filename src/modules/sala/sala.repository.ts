@@ -10,6 +10,9 @@ export const baseParticipacionSalaRepo = AppDataSource.getRepository(Participaci
 
 const escaparLike = (valor: string) => valor.replace(/[\\%_]/g, "\\$&");
 
+const formatearPoint = (ubicacion: { x: number; y: number } | string): string =>
+    typeof ubicacion === "string" ? ubicacion : `POINT(${ubicacion.x} ${ubicacion.y})`;
+
 export const ejecutarTransaccion = async <T>(cb: (manager: EntityManager) => Promise<T>): Promise<T> => {
     return await AppDataSource.transaction(cb);
 };
@@ -129,6 +132,27 @@ export const buscarSalasConFiltros = async (
     };
 };
 
+export const verificarSolapamientoHorario = async (
+    userId: number,
+    fechaInicio: Date,
+    fechaFin: Date
+): Promise<boolean> => {
+    const count = await baseSalaRepo
+        .createQueryBuilder("sala")
+        .leftJoin("sala.participantes", "mi_part", "mi_part.usuario_id = :userId", { userId })
+        .where("sala.estado IN (:...estados)", {
+            estados: [ESTADO_SALA.ABIERTA, ESTADO_SALA.COMPLETA],
+        })
+        .andWhere("(sala.creador_id = :userId OR mi_part.id IS NOT NULL)", { userId })
+        .andWhere("sala.fechaHoraPartido < :fechaFin", { fechaFin })
+        .andWhere("TIMESTAMPADD(MINUTE, sala.duracionMinutos, sala.fechaHoraPartido) > :fechaInicio", {
+            fechaInicio,
+        })
+        .getCount();
+
+    return count > 0;
+};
+
 export const crearNuevaSala = async (data: any, userId: number, manager?: EntityManager) => {
     const { ubicacion, canchaId, ...restoData } = data;
     const repositorio = manager ? manager.getRepository(Sala) : baseSalaRepo;
@@ -136,7 +160,7 @@ export const crearNuevaSala = async (data: any, userId: number, manager?: Entity
         ...restoData,
         cancha: { id: canchaId },
         creador: { id: userId },
-        ubicacion: `POINT(${ubicacion.x} ${ubicacion.y})` as any,
+        ubicacion: formatearPoint(ubicacion),
     } as Partial<Sala>);
     return await repositorio.save(sala);
 };
@@ -168,7 +192,11 @@ export const obtenerSalaSimple = async (salaId: string, manager?: EntityManager)
 
 export const actualizarSala = async (salaId: string, datos: Partial<Sala>, manager?: EntityManager) => {
     const repositorio = manager ? manager.getRepository(Sala) : baseSalaRepo;
-    return await repositorio.update(salaId, datos);
+    const payload = { ...datos };
+    if (payload.ubicacion) {
+        payload.ubicacion = formatearPoint(payload.ubicacion);
+    }
+    return await repositorio.update(salaId, payload);
 };
 
 export const crearParticipacionEnSala = async (
