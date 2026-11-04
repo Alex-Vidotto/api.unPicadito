@@ -53,7 +53,7 @@ export class Sala {
 
     @Column({ type: 'point', srid: 4326 }) 
     @Index({ spatial: true })
-    ubicacion: { x: number, y: number };
+    ubicacion: { x: number, y: number } | string;
 
     @Column({
         type: 'varchar',
