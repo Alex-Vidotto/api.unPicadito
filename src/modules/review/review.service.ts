@@ -1,14 +1,3 @@
-import { AppDataSource } from '../../database/data-source';
-import {
-    guardarReview,
-    calcularPromedio,
-    actualizarReputacion,
-    existeUsuario,
-    existeReview,
-    obtenerSala,
-    participoConfirmado,
-    bloquearUsuario,
-} from './review.repository';
 import { AppDataSource } from "../../database/data-source";
 import { CrearReviewBody } from "./review.schema";
 import {
@@ -16,147 +5,187 @@ import {
     obtenerSala,
     participoConfirmado,
     existeReview,
+    tieneReviewReciente,
     guardarReview,
     calcularPromedio,
     actualizarReputacion,
     existeUsuario,
+    obtenerParticipacionesConfirmadasDeSala,
+    obtenerIdsCalificadosEnSala,
+    obtenerBloqueadosRecientes,
 } from "./review.repository";
 
-const errorHttp = (status: number, mensaje: string) => Object.assign(new Error(mensaje), { status });
+const DIAS_ESPERA_RESENA = 14;
 
-export const crearReviewService = async (datos: CrearReviewBody, calificadorId: number) => {
+const errorHttp = (status: number, mensaje: string) =>
+    Object.assign(new Error(mensaje), { status });
+
+const esErrorDuplicado = (error: unknown): boolean => {
+    if (typeof error !== "object" || error === null) return false;
+    const err = error as { code?: string; errno?: number };
+    return err.code === "ER_DUP_ENTRY" || err.errno === 1062;
+};
+
+export const crearReviewService = async (
+    datos: CrearReviewBody,
+    calificadorId: number,
+) => {
     const { calificadoId, salaId, estrellas, comentario } = datos;
 
-    if (!estrellas || estrellas < 1 || estrellas > 5) {
-        throw new Error("La calificación debe ser entre 1 y 5 estrellas.");
+    if (calificadoId === calificadorId) {
+        throw errorHttp(400, "Un jugador no puede calificarse a sí mismo.");
     }
 
-    const targetCalificado = calificadoId ?? (typeof calificado === 'object' ? calificado?.id : calificado);
-    const idCalificado = Number(targetCalificado);
-
-    if (!idCalificado) {
-        throw new Error("El usuario a calificar es obligatorio.");
-    }
-
-    if (calificadorId === idCalificado) {
-        throw new Error("Un jugador no puede calificarse a sí mismo.");
-    }
-
-    const targetSalaId = salaId ?? (typeof sala === 'object' ? sala?.id : sala);
-    if (!targetSalaId) {
-        throw new Error("El ID de la sala es obligatorio.");
-    }
-
-    return await AppDataSource.transaction(async (manager) => {
-        const calificadoUser = await bloquearUsuario(manager, idCalificado);
-        if (!calificadoUser) throw new Error("Jugador no encontrado.");
-
-        const salaEncontrada = await obtenerSala(manager, targetSalaId);
-        if (!salaEncontrada) throw new Error("Sala no encontrada.");
-        if (salaEncontrada.estado === "CANCELADA") {
-            throw new Error("No se puede calificar en una sala cancelada.");
-        }
-        if (salaEncontrada.fechaHoraPartido.getTime() > Date.now()) {
-            throw new Error("Solo se puede calificar después de que se juegue el partido.");
+    return AppDataSource.transaction(async (manager) => {
+        const sala = await obtenerSala(manager, salaId);
+        if (!sala) throw errorHttp(404, "Sala no encontrada");
+        if (sala.estado !== "FINALIZADA") {
+            throw errorHttp(
+                409,
+                `Solo se puede calificar cuando la sala está FINALIZADA (estado actual: ${sala.estado})`,
+            );
         }
 
-        const calificadorJugo = await participoConfirmado(manager, targetSalaId, calificadorId);
-        if (!calificadorJugo) {
-            throw new Error("Solo podés calificar partidos en los que participaste.");
-        }
-
-        const calificadoJugo = await participoConfirmado(manager, targetSalaId, idCalificado);
-        if (!calificadoJugo) {
-            throw new Error("El jugador calificado no participó en este partido.");
-        }
-
-        const yaCalificado = await existeReview(manager, targetSalaId, calificadorId, idCalificado);
-        if (yaCalificado) {
-            throw new Error("Ya calificaste a este jugador en este partido.");
-        }
-
-        const reviewGuardada = await guardarReview(manager, {
-            salaId: targetSalaId,
+        const calificadorJugo = await participoConfirmado(
+            manager,
+            salaId,
             calificadorId,
-            calificadoId: idCalificado,
-            estrellas,
-            comentario,
-        });
+        );
+        if (!calificadorJugo) {
+            throw errorHttp(
+                403,
+                "Solo los participantes confirmados de la sala pueden calificar",
+            );
+        }
 
-        const ranking = await calcularPromedio(manager, idCalificado);
-        await actualizarReputacion(manager, idCalificado, ranking.promedio);
+        const calificadoJugo = await participoConfirmado(
+            manager,
+            salaId,
+            calificadoId,
+        );
+        if (!calificadoJugo) {
+            throw errorHttp(
+                404,
+                "El jugador a calificar no fue participante confirmado de esta sala",
+            );
+        }
 
-        return {
-            id: reviewGuardada.id,
-            estrellas: reviewGuardada.estrellas,
-            comentario: reviewGuardada.comentario,
-            creadoEn: reviewGuardada.creadoEn,
-            ranking,
-        };
-        if (calificadoId === calificadorId) throw errorHttp(400, "Un jugador no puede calificarse a sí mismo.");
+        const calificado = await bloquearUsuario(manager, calificadoId);
+        if (!calificado) throw errorHttp(404, "Jugador no encontrado");
 
-        return AppDataSource.transaction(async (manager) => {
-            const calificado = await bloquearUsuario(manager, calificadoId);
-            if (!calificado) throw errorHttp(404, "Jugador no encontrado");
+        const yaCalificado = await existeReview(
+            manager,
+            salaId,
+            calificadorId,
+            calificadoId,
+        );
+        if (yaCalificado) {
+            throw errorHttp(
+                409,
+                "Ya calificaste a este jugador en este partido",
+            );
+        }
 
-            const sala = await obtenerSala(manager, salaId);
-            if (!sala) throw errorHttp(404, "Sala no encontrada");
-            if (sala.estado === "CANCELADA") throw errorHttp(409, "No se puede calificar en una sala cancelada");
-            if (sala.fechaHoraPartido.getTime() > Date.now()) {
-                throw errorHttp(409, "Solo se puede calificar después de que se juegue el partido");
-            }
+        const calificadoReciente = await tieneReviewReciente(
+            manager,
+            calificadorId,
+            calificadoId,
+            DIAS_ESPERA_RESENA,
+        );
+        if (calificadoReciente) {
+            throw errorHttp(
+                429,
+                `Ya calificaste a este jugador en los últimos ${DIAS_ESPERA_RESENA} días`,
+            );
+        }
 
-            const calificadorJugo = await participoConfirmado(manager, salaId, calificadorId);
-            if (!calificadorJugo) throw errorHttp(403, "Solo podés calificar partidos en los que participaste");
-
-            const calificadoJugo = await participoConfirmado(manager, salaId, calificadoId);
-            if (!calificadoJugo) throw errorHttp(409, "El jugador calificado no participó en este partido");
-
-            const yaCalificado = await existeReview(manager, salaId, calificadorId, calificadoId);
-            if (yaCalificado) throw errorHttp(409, "Ya calificaste a este jugador en este partido");
-
-            const reviewGuardada = await guardarReview(manager, {
+        let reviewGuardada;
+        try {
+            reviewGuardada = await guardarReview(manager, {
                 salaId,
                 calificadorId,
                 calificadoId,
                 estrellas,
                 comentario,
             });
+        } catch (error) {
+            if (esErrorDuplicado(error)) {
+                throw errorHttp(
+                    409,
+                    "Ya calificaste a este jugador en este partido",
+                );
+            }
+            throw error;
+        }
 
-            const ranking = await calcularPromedio(manager, calificadoId);
-            await actualizarReputacion(manager, calificadoId, ranking.promedio);
+        const ranking = await calcularPromedio(manager, calificadoId);
+        await actualizarReputacion(manager, calificadoId, ranking.promedio);
 
-            return {
+        return {
+            review: {
                 id: reviewGuardada.id,
+                salaId,
+                calificadoId,
                 estrellas: reviewGuardada.estrellas,
-                comentario: reviewGuardada.comentario,
+                comentario: reviewGuardada.comentario ?? null,
                 creadoEn: reviewGuardada.creadoEn,
-                ranking,
-            };
-        });
-    };
+            },
+            reputacionCalificado: ranking.promedio,
+            totalResenas: ranking.totalResenas,
+        };
+    });
+};
 
-    export const obtenerRankingJugador = async (userId: number) => {
-        if (!userId) {
-            throw new Error("El ID del jugador es obligatorio.");
-        }
+export const obtenerRankingService = async (calificadoId: number) => {
+    const existe = await existeUsuario(AppDataSource.manager, calificadoId);
+    if (!existe) throw errorHttp(404, "Jugador no encontrado");
 
-        const existe = await existeUsuario(AppDataSource.manager, userId);
-        if (!existe) {
-            throw new Error("Jugador no encontrado.");
-        }
+    return calcularPromedio(AppDataSource.manager, calificadoId);
+};
 
-        return await calcularPromedio(AppDataSource.manager, userId);
-    };
+export const obtenerPendientesCalificarService = async (
+    salaId: string,
+    userId: number,
+) => {
+    const sala = await obtenerSala(AppDataSource.manager, salaId);
+    if (!sala) throw errorHttp(404, "Sala no encontrada");
+    if (sala.estado !== "FINALIZADA") {
+        throw errorHttp(
+            409,
+            `La sala todavía no está FINALIZADA (estado actual: ${sala.estado})`,
+        );
+    }
 
-    export const ReviewService = {
-        guardarResena,
-        obtenerRankingJugador,
-    };
+    const participaciones =
+        await obtenerParticipacionesConfirmadasDeSala(salaId);
 
-    export const obtenerRankingService = async (calificadoId: number) => {
-        const existe = await existeUsuario(AppDataSource.manager, calificadoId);
-        if (!existe) throw errorHttp(404, "Jugador no encontrado");
+    if (!participaciones.some((p) => p.usuario.id === userId)) {
+        throw errorHttp(
+            403,
+            "Solo los participantes confirmados de la sala pueden calificar",
+        );
+    }
 
-        return calcularPromedio(AppDataSource.manager, calificadoId);
-    };
+    const companeros = participaciones.filter((p) => p.usuario.id !== userId);
+    if (companeros.length === 0) return { salaId, pendientes: [] };
+
+    const [yaCalificados, bloqueados] = await Promise.all([
+        obtenerIdsCalificadosEnSala(salaId, userId),
+        obtenerBloqueadosRecientes(userId, DIAS_ESPERA_RESENA),
+    ]);
+
+    const pendientes = companeros
+        .filter((p) => !yaCalificados.has(p.usuario.id))
+        .map((p) => ({
+            userId: p.usuario.id,
+            nombre: p.usuario.nombre,
+            apellido: p.usuario.apellido,
+            nombreUsuario: p.usuario.nombreUsuario,
+            fotoPerfilUrl: p.usuario.fotoPerfilUrl ?? null,
+            posicionPrincipal: p.usuario.posicionPrincipal,
+            puedeCalificar: !bloqueados.has(p.usuario.id),
+            diasRestantes: bloqueados.get(p.usuario.id) ?? 0,
+        }));
+
+    return { salaId, pendientes };
+};
