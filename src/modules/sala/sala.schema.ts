@@ -19,6 +19,7 @@ export const buscarSalasQuerySchema = z.object({
     esPublica: booleanQuery.optional(),
     permiteSuplentes: booleanQuery.optional(),
     misSalas: booleanQuery.optional(),
+    misPartidos: booleanQuery.optional(),
     nombre: z.string().optional(),
     nombreCancha: z.string().optional(),
     limite: z.coerce.number().int().positive().max(100).default(20),

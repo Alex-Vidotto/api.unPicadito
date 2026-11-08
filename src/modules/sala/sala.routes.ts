@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as salaController from "./sala.controller";
+import * as reviewController from "../review/review.controller";
 import { validateMiddleware } from "../../middlewares/validate.middleware";
 import { buscarSalasQuerySchema, cambiarEstadoSalaBodySchema, crearSalaBodySchema, editarSalaBodySchema, expulsarJugadorSchema, salaIdParamsSchema, transferirOrganizadorBodySchema, aceptarSolicitudParamsSchema } from "./sala.schema";
 
@@ -22,4 +23,11 @@ router.patch(
     validateMiddleware(salaIdParamsSchema, "params"),
     salaController.finalizar,
 );
+
+router.get(
+    "/:id/pendientes-calificar",
+    validateMiddleware(salaIdParamsSchema, "params"),
+    reviewController.pendientesCalificar,
+);
+
 export default router;

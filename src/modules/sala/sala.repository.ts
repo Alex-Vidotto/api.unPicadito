@@ -25,23 +25,39 @@ export const buscarSalasConFiltros = async (
     const {
         lat, lng, radioKm, fechaInicio, fechaFin, esPublica,
         permiteSuplentes, estadoDisponibilidad, nombre, nombreCancha,
-        limite, pagina, misSalas,
+        limite, pagina, misSalas, misPartidos,
     } = filtros;
+
+    const filtrarMisPartidos = Boolean(misPartidos || misSalas);
 
     const query = baseSalaRepo.createQueryBuilder("sala")
         .leftJoinAndSelect("sala.creador", "creador")
         .leftJoinAndSelect("sala.cancha", "cancha")
         .leftJoinAndSelect("cancha.predio", "predio")
-        .leftJoin("sala.participantes", "participacion", "participacion.estado = :confirmado", { confirmado: ESTADO_PARTICIPACION.CONFIRMADO })
-        .where("sala.estado IN (:...estados)", { estados: [ESTADO_SALA.ABIERTA, ESTADO_SALA.COMPLETA] });
+        .leftJoin("sala.participantes", "participacion", "participacion.estado = :confirmado", { confirmado: ESTADO_PARTICIPACION.CONFIRMADO });
+
+    if (filtrarMisPartidos && userId !== undefined) {
+        query.where("sala.estado IN (:...estados)", {
+            estados: [ESTADO_SALA.ABIERTA, ESTADO_SALA.COMPLETA, ESTADO_SALA.FINALIZADA],
+        });
+    } else {
+        query.where("sala.estado IN (:...estados)", {
+            estados: [ESTADO_SALA.ABIERTA, ESTADO_SALA.COMPLETA],
+        });
+    }
 
     if (nombre) query.andWhere("sala.nombre LIKE :nombre", { nombre: `%${escaparLike(nombre)}%` });
     if (nombreCancha) query.andWhere("sala.nombreCancha LIKE :nombreCancha", { nombreCancha: `%${escaparLike(nombreCancha)}%` });
     if (esPublica !== undefined) query.andWhere("sala.esPublica = :esPublica", { esPublica });
     if (permiteSuplentes !== undefined) query.andWhere("sala.permiteSuplentes = :permiteSuplentes", { permiteSuplentes });
-    const ahora = new Date();
-    const fechaMinima = fechaInicio && new Date(fechaInicio) > ahora ? fechaInicio : ahora;
-    query.andWhere("sala.fechaHoraPartido >= :fechaMinima", { fechaMinima });
+
+    if (!filtrarMisPartidos) {
+        const ahora = new Date();
+        const fechaMinima = fechaInicio && new Date(fechaInicio) > ahora ? fechaInicio : ahora;
+        query.andWhere("sala.fechaHoraPartido >= :fechaMinima", { fechaMinima });
+    } else if (fechaInicio) {
+        query.andWhere("sala.fechaHoraPartido >= :fechaInicio", { fechaInicio });
+    }
 
     if (fechaFin) query.andWhere("sala.fechaHoraPartido <= :fechaFin", { fechaFin });
 
@@ -62,8 +78,11 @@ export const buscarSalasConFiltros = async (
             "solicitudPendiente"
         );
 
-        if (misSalas) {
-            query.andWhere("(sala.creador_id = :userId OR mi_part.id IS NOT NULL)", { userId });
+        if (filtrarMisPartidos) {
+            query.andWhere(
+                "(sala.creador_id = :userId OR mi_part.estado IN (:...estadosMiPart))",
+                { userId, estadosMiPart: [ESTADO_PARTICIPACION.CONFIRMADO, ESTADO_PARTICIPACION.PENDIENTE] }
+            );
         }
     } else {
         query.addSelect("0", "unidoPorUsuarioActual");
@@ -86,7 +105,7 @@ export const buscarSalasConFiltros = async (
         .getRawOne();
     const total = Number(totalRaw?.total || 0);
 
-    query.orderBy("sala.fechaHoraPartido", "ASC")
+    query.orderBy("sala.fechaHoraPartido", filtrarMisPartidos ? "DESC" : "ASC")
         .addOrderBy("sala.id", "ASC")
         .skip((pagina - 1) * limite)
         .take(limite);

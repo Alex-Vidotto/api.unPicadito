@@ -2,9 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, Jo
 import { User } from '../user/user.entity';
 import { Sala } from '../sala/sala.entity';
 
-
 @Entity('reviews')
-@Unique(['calificador', 'calificado', 'sala'])
+@Unique('UQ_review_calificador_calificado_sala', ['calificador', 'calificado', 'sala'])
 export class Review {
     @PrimaryGeneratedColumn('uuid')
     id: string;
